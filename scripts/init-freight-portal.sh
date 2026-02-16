@@ -261,7 +261,11 @@ configure_mirrors() {
     case $cloud in
         aliyun)
             log_info "Using Alibaba Cloud mirrors"
+            # npm使用阿里云镜像
             npm config set registry https://registry.npmmirror.com
+            npm config set disturl https://npmmirror.com/dist
+            npm config set electron_mirror https://npmmirror.com/mirrors/electron/
+            # apt使用阿里云镜像
             if [ "$os" = "ubuntu" ] || [ "$os" = "debian" ]; then
                 sed -i 's|http://.*archive.ubuntu.com|http://mirrors.aliyun.com|g' /etc/apt/sources.list 2>/dev/null || true
                 sed -i 's|http://.*security.ubuntu.com|http://mirrors.aliyun.com|g' /etc/apt/sources.list 2>/dev/null || true
@@ -271,6 +275,7 @@ configure_mirrors() {
         tencent)
             log_info "Using Tencent Cloud mirrors"
             npm config set registry https://mirrors.cloud.tencent.com/npm/
+            npm config set disturl https://mirrors.cloud.tencent.com/nodejs-release/
             if [ "$os" = "ubuntu" ] || [ "$os" = "debian" ]; then
                 sed -i 's|http://.*archive.ubuntu.com|http://mirrors.tencentyun.com|g' /etc/apt/sources.list 2>/dev/null || true
                 sed -i 's|http://.*security.ubuntu.com|http://mirrors.tencentyun.com|g' /etc/apt/sources.list 2>/dev/null || true
@@ -279,6 +284,7 @@ configure_mirrors() {
         huawei)
             log_info "Using Huawei Cloud mirrors"
             npm config set registry https://mirrors.huaweicloud.com/repository/npm/
+            npm config set disturl https://mirrors.huaweicloud.com/nodejs/
             if [ "$os" = "ubuntu" ] || [ "$os" = "debian" ]; then
                 sed -i 's|http://.*archive.ubuntu.com|https://repo.huaweicloud.com|g' /etc/apt/sources.list 2>/dev/null || true
             fi
@@ -286,10 +292,12 @@ configure_mirrors() {
         *)
             log_info "Using default mirrors (Taobao npm)"
             npm config set registry https://registry.npmmirror.com
+            npm config set disturl https://npmmirror.com/dist
             ;;
     esac
 
     log_info "NPM registry: $(npm config get registry)"
+    log_info "NPM disturl: $(npm config get disturl)"
 }
 
 # =============================================================================
@@ -401,11 +409,21 @@ step_install_npm_deps() {
     cd "${PROJECT_DIR}/source/backend"
 
     log_info "Current npm registry: $(npm config get registry)"
-    show_progress "Installing npm packages (this may take 3-5 minutes)"
-
-    # Show npm install output for debugging
-    npm install --production 2>&1 | tee -a "$LOG_FILE" | grep -E "(added|packages|warn|ERR!)" || true
-
+    
+    # 设置 npm 以加速安装
+    npm config set fetch-retries 5
+    npm config set fetch-retry-mintimeout 20000
+    npm config set fetch-retry-maxtimeout 120000
+    
+    show_progress "Installing npm packages (this may take 3-5 minutes)..."
+    
+    # 使用 npm ci 如果有 package-lock.json，否则使用 npm install
+    if [ -f "package-lock.json" ]; then
+        npm ci --production --progress=false 2>&1 | tee -a "$LOG_FILE" | grep -E "(added|packages|warn|ERR!)" || true
+    else
+        npm install --production --progress=false 2>&1 | tee -a "$LOG_FILE" | grep -E "(added|packages|warn|ERR!)" || true
+    fi
+    
     show_success "NPM dependencies installed"
 }
 
