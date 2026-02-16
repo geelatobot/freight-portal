@@ -1,334 +1,562 @@
 #!/bin/bash
+#
+# Freight Portal Installation Script
+# Reference: Docker, K8s, NodeSource best practices
+# Features: Error handling, detailed logging, retry logic, progress tracking
+#
+
+set -o errexit
+set -o nounset
+set -o pipefail
 
 # =============================================================================
-# 货代客户门户 - 智能镜像加速版
-# 自动检测云服务商并使用对应镜像
+# Configuration
+# =============================================================================
+readonly SCRIPT_VERSION="2.0.0"
+readonly SCRIPT_NAME="freight-portal-installer"
+readonly PROJECT_DIR="/opt/freight-portal"
+readonly CONFIG_DIR="${PROJECT_DIR}/shared"
+readonly CONFIG_FILE="${CONFIG_DIR}/.env"
+readonly LOG_FILE="/var/log/${SCRIPT_NAME}.log"
+readonly LOCK_FILE="/var/run/${SCRIPT_NAME}.lock"
+
+# Colors
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[1;33m'
+readonly BLUE='\033[0;34m'
+readonly CYAN='\033[0;36m'
+readonly GRAY='\033[0;37m'
+readonly NC='\033[0m'
+
+# Counters
+TOTAL_STEPS=10
+CURRENT_STEP=0
+
+# =============================================================================
+# Logging Functions
 # =============================================================================
 
-set -e
-
-# 颜色输出
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-NC='\033[0m'
-
-# 基础配置
-PROJECT_DIR="/opt/freight-portal"
-CONFIG_DIR="$PROJECT_DIR/shared"
-CONFIG_FILE="$CONFIG_DIR/.env"
-
-# 打印带时间的日志
-log() {
-    echo -e "${BLUE}[$(date '+%H:%M:%S')]${NC} $1"
+# Initialize logging
+init_logging() {
+    mkdir -p "$(dirname "$LOG_FILE")"
+    exec 1> >(tee -a "$LOG_FILE")
+    exec 2> >(tee -a "$LOG_FILE" >&2)
+    log_info "Script version: ${SCRIPT_VERSION}"
+    log_info "Log file: ${LOG_FILE}"
 }
 
-# 打印步骤
-step() {
+# Log levels
+log_info() {
+    printf "${BLUE}[%s] [INFO]${NC} %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "$1"
+}
+
+log_success() {
+    printf "${GREEN}[%s] [SUCCESS]${NC} %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "$1"
+}
+
+log_warn() {
+    printf "${YELLOW}[%s] [WARN]${NC} %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "$1"
+}
+
+log_error() {
+    printf "${RED}[%s] [ERROR]${NC} %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >&2
+}
+
+log_debug() {
+    printf "${GRAY}[%s] [DEBUG]${NC} %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "$1"
+}
+
+# =============================================================================
+# Progress Display
+# =============================================================================
+
+show_header() {
     echo ""
-    echo -e "${YELLOW}========================================${NC}"
-    echo -e "${YELLOW} 步骤 $1/10: $2${NC}"
-    echo -e "${YELLOW}========================================${NC}"
+    echo "╔════════════════════════════════════════════════════════════════╗"
+    echo "║                  Freight Portal Installer                      ║"
+    echo "║                      Version ${SCRIPT_VERSION}                          ║"
+    echo "╚════════════════════════════════════════════════════════════════╝"
+    echo ""
 }
 
-# 打印成功
-success() {
-    echo -e "${GREEN}✓ $1${NC}"
+show_step() {
+    CURRENT_STEP=$((CURRENT_STEP + 1))
+    local title="$1"
+    echo ""
+    echo "┌────────────────────────────────────────────────────────────────┐"
+    printf "│ Step %2d/%d: %-50s │\n" "$CURRENT_STEP" "$TOTAL_STEPS" "$title"
+    echo "└────────────────────────────────────────────────────────────────┘"
+    log_info "Starting: $title"
 }
 
-# 打印信息
-info() {
-    echo -e "${CYAN}ℹ $1${NC}"
+show_progress() {
+    local message="$1"
+    printf "    → %s...\n" "$message"
 }
 
-# 显示进度动画
-spinner() {
-    local pid=$1
-    local delay=0.1
-    local spinstr='|/-\'
-    while [ "$(ps a | awk '{print $1}' | grep $pid)" ]; do
-        local temp=${spinstr#?}
-        printf " [%c]  " "$spinstr"
-        local spinstr=$temp${spinstr%"$temp"}
-        sleep $delay
-        printf "\b\b\b\b\b\b"
+show_success() {
+    log_success "$1"
+}
+
+show_error() {
+    log_error "$1"
+}
+
+# =============================================================================
+# Error Handling
+# =============================================================================
+
+cleanup() {
+    local exit_code=$?
+    if [ $exit_code -ne 0 ]; then
+        echo ""
+        echo "╔════════════════════════════════════════════════════════════════╗"
+        echo "║                     INSTALLATION FAILED                        ║"
+        echo "╚════════════════════════════════════════════════════════════════╝"
+        echo ""
+        log_error "Installation failed with exit code: $exit_code"
+        log_info "Check log file for details: ${LOG_FILE}"
+        log_info "To retry, run the script again"
+    fi
+    rm -f "$LOCK_FILE"
+    exit $exit_code
+}
+
+trap cleanup EXIT
+
+# Check if already running
+check_lock() {
+    if [ -f "$LOCK_FILE" ]; then
+        local pid
+        pid=$(cat "$LOCK_FILE" 2>/dev/null || echo "")
+        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+            log_error "Script is already running (PID: $pid)"
+            exit 1
+        fi
+    fi
+    echo $$ > "$LOCK_FILE"
+}
+
+# =============================================================================
+# Command Execution with Retry
+# =============================================================================
+
+# Execute command with retry logic
+# Usage: retry [retries] [delay] command
+retry() {
+    local retries=$1
+    local delay=$2
+    shift 2
+    local count=0
+
+    while [ $count -lt $retries ]; do
+        if "$@"; then
+            return 0
+        fi
+        count=$((count + 1))
+        log_warn "Command failed (attempt $count/$retries): $*"
+        if [ $count -lt $retries ]; then
+            log_info "Retrying in ${delay} seconds..."
+            sleep "$delay"
+        fi
     done
-    printf "    \b\b\b\b"
+
+    log_error "Command failed after $retries attempts: $*"
+    return 1
+}
+
+# Execute command with timeout and progress
+# Usage: run_with_timeout [timeout_seconds] [message] command
+run_with_timeout() {
+    local timeout=$1
+    local message="$2"
+    shift 2
+    local pid
+    local spin='⣾⣽⣻⢿⡿⣟⣯⣷'
+    local i=0
+
+    show_progress "$message"
+    log_debug "Executing: $*"
+
+    # Run command in background
+    "$@" &
+    pid=$!
+
+    # Show spinner while waiting
+    while kill -0 $pid 2>/dev/null; do
+        printf "\r    %s %s" "${spin:$i:1}" "$message"
+        i=$(((i + 1) % 8))
+        sleep 0.1
+    done
+
+    printf "\r    ✓ %s    \n" "$message"
+
+    # Get exit code
+    wait $pid
+    return $?
 }
 
 # =============================================================================
-# 检测云服务商
+# System Detection
 # =============================================================================
+
+detect_os() {
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        echo "$ID"
+    elif [ -f /etc/redhat-release ]; then
+        echo "rhel"
+    else
+        echo "unknown"
+    fi
+}
+
 detect_cloud_provider() {
-    log "检测云服务商..."
-    
-    # 检测阿里云
-    if curl -s --connect-timeout 2 http://100.100.100.200/latest/meta-data/ 2>/dev/null | grep -q "instance-id"; then
+    log_info "Detecting cloud provider..."
+
+    # Alibaba Cloud
+    if retry 3 2 curl -s --connect-timeout 3 "http://100.100.100.200/latest/meta-data/instance-id" > /dev/null 2>&1; then
         echo "aliyun"
         return
     fi
-    
-    # 检测腾讯云
-    if curl -s --connect-timeout 2 http://metadata.tencentyun.com/latest/meta-data/ 2>/dev/null | grep -q "instance-id"; then
+
+    # Tencent Cloud
+    if retry 3 2 curl -s --connect-timeout 3 "http://metadata.tencentyun.com/latest/meta-data/instance-id" > /dev/null 2>&1; then
         echo "tencent"
         return
     fi
-    
-    # 检测华为云
-    if curl -s --connect-timeout 2 http://169.254.169.254/latest/meta-data/ 2>/dev/null | grep -q "instance-id"; then
+
+    # Huawei Cloud
+    if retry 3 2 curl -s --connect-timeout 3 "http://169.254.169.254/openstack/latest/meta_data.json" > /dev/null 2>&1; then
         echo "huawei"
         return
     fi
-    
-    # 检测AWS
-    if curl -s --connect-timeout 2 http://169.254.169.254/latest/meta-data/ 2>/dev/null | grep -q "instance-id"; then
+
+    # AWS
+    if retry 3 2 curl -s --connect-timeout 3 "http://169.254.169.254/latest/meta-data/instance-id" > /dev/null 2>&1; then
         echo "aws"
         return
     fi
-    
-    # 检测Azure
-    if curl -s --connect-timeout 2 http://169.254.169.254/metadata/instance?api-version=2021-02-01 2>/dev/null | grep -q "compute"; then
+
+    # Azure
+    if retry 3 2 curl -s --connect-timeout 3 -H "Metadata:true" "http://169.254.169.254/metadata/instance?api-version=2021-02-01" > /dev/null 2>&1; then
         echo "azure"
         return
     fi
-    
-    # 默认
+
     echo "unknown"
 }
 
 # =============================================================================
-# 配置镜像源
+# Mirror Configuration
 # =============================================================================
-setup_mirrors() {
+
+configure_mirrors() {
     local cloud=$1
-    
-    step "2" "配置镜像源 ($cloud)"
-    
+    local os=$(detect_os)
+
+    log_info "Configuring mirrors for: $cloud on $os"
+
     case $cloud in
         aliyun)
-            info "检测到阿里云服务器，使用阿里云镜像"
-            # npm使用阿里云镜像
+            log_info "Using Alibaba Cloud mirrors"
             npm config set registry https://registry.npmmirror.com
-            # apt使用阿里云镜像
-            sed -i 's/archive.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list 2>/dev/null || true
-            sed -i 's/security.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list 2>/dev/null || true
-            sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list 2>/dev/null || true
+            if [ "$os" = "ubuntu" ] || [ "$os" = "debian" ]; then
+                sed -i 's|http://.*archive.ubuntu.com|http://mirrors.aliyun.com|g' /etc/apt/sources.list 2>/dev/null || true
+                sed -i 's|http://.*security.ubuntu.com|http://mirrors.aliyun.com|g' /etc/apt/sources.list 2>/dev/null || true
+                sed -i 's|http://deb.debian.org|http://mirrors.aliyun.com|g' /etc/apt/sources.list 2>/dev/null || true
+            fi
             ;;
         tencent)
-            info "检测到腾讯云服务器，使用腾讯云镜像"
+            log_info "Using Tencent Cloud mirrors"
             npm config set registry https://mirrors.cloud.tencent.com/npm/
-            sed -i 's/archive.ubuntu.com/mirrors.tencent.com/g' /etc/apt/sources.list 2>/dev/null || true
-            sed -i 's/security.ubuntu.com/mirrors.tencent.com/g' /etc/apt/sources.list 2>/dev/null || true
+            if [ "$os" = "ubuntu" ] || [ "$os" = "debian" ]; then
+                sed -i 's|http://.*archive.ubuntu.com|http://mirrors.tencentyun.com|g' /etc/apt/sources.list 2>/dev/null || true
+                sed -i 's|http://.*security.ubuntu.com|http://mirrors.tencentyun.com|g' /etc/apt/sources.list 2>/dev/null || true
+            fi
             ;;
         huawei)
-            info "检测到华为云服务器，使用华为云镜像"
+            log_info "Using Huawei Cloud mirrors"
             npm config set registry https://mirrors.huaweicloud.com/repository/npm/
-            sed -i 's/archive.ubuntu.com/repo.huaweicloud.com/g' /etc/apt/sources.list 2>/dev/null || true
-            ;;
-        aws)
-            info "检测到AWS服务器，使用官方镜像"
-            npm config set registry https://registry.npmjs.org/
-            ;;
-        azure)
-            info "检测到Azure服务器，使用官方镜像"
-            npm config set registry https://registry.npmjs.org/
+            if [ "$os" = "ubuntu" ] || [ "$os" = "debian" ]; then
+                sed -i 's|http://.*archive.ubuntu.com|https://repo.huaweicloud.com|g' /etc/apt/sources.list 2>/dev/null || true
+            fi
             ;;
         *)
-            info "未检测到云服务商，使用国内默认镜像（淘宝npm）"
+            log_info "Using default mirrors (Taobao npm)"
             npm config set registry https://registry.npmmirror.com
             ;;
     esac
-    
-    success "镜像源配置完成"
-    log "npm registry: $(npm config get registry)"
+
+    log_info "NPM registry: $(npm config get registry)"
 }
 
 # =============================================================================
-# 主程序开始
+# Main Installation Steps
 # =============================================================================
-echo -e "${GREEN}======================================${NC}"
-echo -e "${GREEN}货代客户门户 - 智能镜像加速版${NC}"
-echo -e "${GREEN}======================================${NC}"
-echo ""
 
-# 步骤0: 检查配置文件
-step "0" "检查配置文件"
+step_check_config() {
+    show_step "Check Configuration"
 
-if [ ! -f "$CONFIG_FILE" ]; then
-    echo -e "${RED}✗ 错误: 未找到配置文件${NC}"
-    echo ""
-    echo "请先创建配置文件:"
-    echo "  mkdir -p $CONFIG_DIR"
-    echo "  nano $CONFIG_FILE"
-    echo ""
-    echo "配置文件内容示例:"
-    cat << 'EXAMPLE'
-DATABASE_URL="mysql://用户名:密码@主机:3306/数据库名"
+    if [ ! -f "$CONFIG_FILE" ]; then
+        show_error "Configuration file not found: $CONFIG_FILE"
+        echo ""
+        echo "Please create the configuration file first:"
+        echo "  mkdir -p $CONFIG_DIR"
+        echo "  nano $CONFIG_FILE"
+        echo ""
+        echo "Example configuration:"
+        cat << 'EXAMPLE'
+DATABASE_URL="mysql://username:password@host:3306/database"
 JWT_SECRET=""
 JWT_EXPIRES_IN="15m"
-EOF
-    exit 1
-fi
+JWT_REFRESH_EXPIRES_IN="7d"
+PORT=3000
+NODE_ENV="production"
+API_PREFIX="/api/v1"
+FOURPORTUN_API_URL="https://prod-api.4portun.com"
+FOURPORTUN_APPID=""
+FOURPORTUN_SECRET=""
+KIMI_API_KEY=""
+EXAMPLE
+        exit 1
+    fi
 
-log "加载配置文件..."
-source "$CONFIG_FILE"
-success "配置文件加载完成"
+    show_progress "Loading configuration"
+    set -a
+    source "$CONFIG_FILE"
+    set +a
+    show_success "Configuration loaded"
 
-# 自动生成JWT
-if [ -z "$JWT_SECRET" ]; then
-    log "生成JWT密钥..."
-    JWT_SECRET="fp-$(date +%s)-$(openssl rand -hex 16)"
-    sed -i "s/JWT_SECRET=.*/JWT_SECRET=\"$JWT_SECRET\"/" "$CONFIG_FILE"
-    success "JWT密钥已生成并保存"
-fi
+    # Generate JWT if not set
+    if [ -z "${JWT_SECRET:-}" ]; then
+        show_progress "Generating JWT secret"
+        JWT_SECRET="fp-$(date +%s)-$(openssl rand -hex 16)"
+        sed -i "s/JWT_SECRET=.*/JWT_SECRET=\"$JWT_SECRET\"/" "$CONFIG_FILE"
+        show_success "JWT secret generated and saved"
+    fi
 
-# 步骤1: 检测云服务商并配置镜像
-CLOUD_PROVIDER=$(detect_cloud_provider)
-setup_mirrors "$CLOUD_PROVIDER"
+    log_debug "Database URL: ${DATABASE_URL//:*@/:***@}"
+}
 
-# 步骤3: 安装系统依赖
-step "3" "安装系统依赖"
+step_configure_mirrors() {
+    show_step "Configure Mirrors"
+    CLOUD_PROVIDER=$(detect_cloud_provider)
+    log_info "Detected cloud provider: $CLOUD_PROVIDER"
+    configure_mirrors "$CLOUD_PROVIDER"
+    show_success "Mirrors configured"
+}
 
-log "更新软件源..."
-(apt-get update -qq) &
-spinner $!
-success "软件源更新完成"
+step_install_system_deps() {
+    show_step "Install System Dependencies"
 
-log "安装必要软件..."
-apt-get install -y curl git nginx openssl -qq > /dev/null 2>&1
-success "系统依赖安装完成"
+    show_progress "Updating package lists"
+    run_with_timeout 120 "apt-get update" apt-get update -qq
+    show_success "Package lists updated"
 
-# 步骤4: 安装Node.js
-step "4" "安装Node.js"
+    show_progress "Installing required packages"
+    run_with_timeout 180 "install packages" apt-get install -y -qq curl git nginx openssl
+    show_success "System dependencies installed"
+}
 
-log "下载Node.js安装脚本..."
-(curl -fsSL https://deb.nodesource.com/setup_20.x | bash - > /dev/null 2>&1) &
-spinner $!
-success "Node.js安装脚本下载完成"
+step_install_nodejs() {
+    show_step "Install Node.js"
 
-log "安装Node.js和npm..."
-apt-get install -y nodejs -qq > /dev/null 2>&1
-success "Node.js安装完成: $(node -v)"
+    show_progress "Downloading NodeSource setup script"
+    run_with_timeout 60 "download nodesource" curl -fsSL https://deb.nodesource.com/setup_20.x -o /tmp/nodesource_setup.sh
+    show_success "NodeSource script downloaded"
 
-log "安装PM2..."
-npm install -g pm2 --silent > /dev/null 2>&1
-success "PM2安装完成"
+    show_progress "Running NodeSource setup"
+    bash /tmp/nodesource_setup.sh > /dev/null 2>&1
+    show_success "NodeSource setup complete"
 
-# 步骤5: 下载代码
-step "5" "下载代码"
+    show_progress "Installing Node.js"
+    run_with_timeout 120 "install nodejs" apt-get install -y -qq nodejs
+    show_success "Node.js installed: $(node -v)"
 
-if [ -d "$PROJECT_DIR/source" ]; then
-    log "代码已存在，更新代码..."
-    cd $PROJECT_DIR/source
-    git pull origin main
-else
-    log "克隆代码仓库..."
-    mkdir -p $PROJECT_DIR
-    git clone --depth 1 https://github.com/geelatobot/freight-portal.git $PROJECT_DIR/source
-fi
-success "代码下载完成"
+    show_progress "Installing PM2"
+    run_with_timeout 60 "install pm2" npm install -g pm2
+    show_success "PM2 installed: $(pm2 -v)"
+}
 
-# 步骤6: 安装项目依赖
-step "6" "安装项目依赖"
+step_download_code() {
+    show_step "Download Source Code"
 
-cd $PROJECT_DIR/source/backend
+    if [ -d "${PROJECT_DIR}/source/.git" ]; then
+        show_progress "Updating existing code"
+        cd "${PROJECT_DIR}/source"
+        run_with_timeout 60 "git pull" git pull origin main
+    else
+        show_progress "Cloning repository"
+        mkdir -p "$PROJECT_DIR"
+        run_with_timeout 120 "git clone" git clone --depth 1 https://github.com/geelatobot/freight-portal.git "${PROJECT_DIR}/source"
+    fi
+    show_success "Source code ready"
+}
 
-log "安装npm依赖（使用镜像加速）..."
-echo "    当前镜像: $(npm config get registry)"
-echo "    正在下载，请稍候..."
-npm install --production 2>&1 | grep -E "(added|packages|warn|err)" || true
-success "npm依赖安装完成"
+step_install_npm_deps() {
+    show_step "Install NPM Dependencies"
 
-# 步骤7: 复制配置文件
-step "7" "复制配置文件"
+    cd "${PROJECT_DIR}/source/backend"
 
-cp "$CONFIG_FILE" .
-success "配置文件复制完成"
+    log_info "Current npm registry: $(npm config get registry)"
+    show_progress "Installing npm packages (this may take 3-5 minutes)"
 
-# 步骤8: 数据库迁移
-step "8" "数据库迁移"
+    # Show npm install output for debugging
+    npm install --production 2>&1 | tee -a "$LOG_FILE" | grep -E "(added|packages|warn|ERR!)" || true
 
-log "生成Prisma客户端..."
-npx prisma generate > /dev/null 2>&1
-success "Prisma客户端生成完成"
+    show_success "NPM dependencies installed"
+}
 
-log "执行数据库迁移..."
-npx prisma migrate deploy
-success "数据库迁移完成"
+step_database_migration() {
+    show_step "Database Migration"
 
-# 步骤9: 构建应用
-step "9" "构建应用"
+    cd "${PROJECT_DIR}/source/backend"
 
-log "编译TypeScript..."
-npm run build > /dev/null 2>&1
-success "应用构建完成"
+    show_progress "Copying configuration file"
+    cp "$CONFIG_FILE" .
+    show_success "Configuration copied"
 
-# 步骤10: 配置Nginx和启动
-step "10" "配置Nginx和启动"
+    show_progress "Generating Prisma client"
+    npx prisma generate 2>&1 | tee -a "$LOG_FILE" | tail -5
+    show_success "Prisma client generated"
 
-cat > /etc/nginx/sites-available/freight-portal << 'EOF'
+    show_progress "Running database migrations"
+    npx prisma migrate deploy 2>&1 | tee -a "$LOG_FILE"
+    show_success "Database migrations complete"
+}
+
+step_build_application() {
+    show_step "Build Application"
+
+    cd "${PROJECT_DIR}/source/backend"
+
+    show_progress "Compiling TypeScript"
+    npm run build 2>&1 | tee -a "$LOG_FILE" | tail -10
+    show_success "Application built successfully"
+}
+
+step_configure_nginx() {
+    show_step "Configure Nginx"
+
+    show_progress "Creating Nginx configuration"
+    cat > /etc/nginx/sites-available/freight-portal << 'EOF'
 server {
     listen 80;
     server_name _;
-    
+
     location / {
         proxy_pass http://localhost:3000;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300s;
+    }
+
+    location /health {
+        proxy_pass http://localhost:3000/api/v1/health;
+        access_log off;
     }
 }
 EOF
 
-rm -f /etc/nginx/sites-enabled/default
-ln -sf /etc/nginx/sites-available/freight-portal /etc/nginx/sites-enabled/
-nginx -t > /dev/null 2>&1 && systemctl restart nginx
-success "Nginx配置完成"
+    rm -f /etc/nginx/sites-enabled/default
+    ln -sf /etc/nginx/sites-available/freight-portal /etc/nginx/sites-enabled/
 
-ln -sfn $PROJECT_DIR/source/backend $PROJECT_DIR/current
-cd $PROJECT_DIR/current
+    show_progress "Testing Nginx configuration"
+    nginx -t 2>&1 | tee -a "$LOG_FILE"
 
-log "停止旧服务..."
-pm2 delete freight-portal 2>/dev/null || true
+    show_progress "Restarting Nginx"
+    systemctl restart nginx
 
-log "启动新服务..."
-pm2 start ecosystem.config.js --name freight-portal --env production > /dev/null 2>&1
-pm2 save > /dev/null 2>&1
-success "服务启动完成"
+    show_success "Nginx configured"
+}
 
-# 健康检查
-echo ""
-echo -e "${YELLOW}========================================${NC}"
-echo -e "${YELLOW} 健康检查${NC}"
-echo -e "${YELLOW}========================================${NC}"
+step_start_service() {
+    show_step "Start Service"
 
-log "等待服务启动..."
-for i in 1 2 3 4 5; do
-    if curl -sf http://localhost:3000/api/v1/health > /dev/null 2>&1; then
-        success "服务运行正常"
-        break
-    fi
-    echo "  尝试 $i/5..."
-    sleep 2
-done
+    show_progress "Creating symbolic link"
+    ln -sfn "${PROJECT_DIR}/source/backend" "${PROJECT_DIR}/current"
+    cd "${PROJECT_DIR}/current"
 
-# 完成
-echo ""
-echo -e "${GREEN}======================================${NC}"
-echo -e "${GREEN}✅ 初始化完成！${NC}"
-echo -e "${GREEN}======================================${NC}"
-echo ""
-echo -e "云服务商: ${CYAN}$CLOUD_PROVIDER${NC}"
-echo -e "npm镜像: ${CYAN}$(npm config get registry)${NC}"
-echo ""
-echo -e "访问地址:"
-echo -e "  ${YELLOW}http://$(curl -s ifconfig.me)/api/v1/health${NC}"
-echo ""
-echo -e "常用命令:"
-echo -e "  ${YELLOW}pm2 logs freight-portal${NC}     # 查看日志"
-echo -e "  ${YELLOW}pm2 restart freight-portal${NC}  # 重启服务"
-echo -e "  ${YELLOW}pm2 status${NC}                  # 查看状态"
-echo ""
+    show_progress "Stopping old service (if exists)"
+    pm2 delete freight-portal 2>/dev/null || true
+
+    show_progress "Starting new service"
+    pm2 start ecosystem.config.js --name freight-portal --env production
+    pm2 save
+
+    show_success "Service started"
+}
+
+step_health_check() {
+    show_step "Health Check"
+
+    local max_attempts=10
+    local attempt=1
+
+    while [ $attempt -le $max_attempts ]; do
+        show_progress "Health check attempt $attempt/$max_attempts"
+        if curl -sf http://localhost:3000/api/v1/health > /dev/null 2>&1; then
+            show_success "Service is healthy"
+            return 0
+        fi
+        sleep 2
+        attempt=$((attempt + 1))
+    done
+
+    show_error "Health check failed after $max_attempts attempts"
+    log_info "Showing last 20 lines of service logs:"
+    pm2 logs freight-portal --lines 20 || true
+    exit 1
+}
+
+# =============================================================================
+# Main
+# =============================================================================
+
+main() {
+    show_header
+    init_logging
+    check_lock
+
+    log_info "Starting installation..."
+    log_info "OS: $(detect_os)"
+    log_info "Architecture: $(uname -m)"
+
+    step_check_config
+    step_configure_mirrors
+    step_install_system_deps
+    step_install_nodejs
+    step_download_code
+    step_install_npm_deps
+    step_database_migration
+    step_build_application
+    step_configure_nginx
+    step_start_service
+    step_health_check
+
+    # Success
+    echo ""
+    echo "╔════════════════════════════════════════════════════════════════╗"
+    echo "║                  INSTALLATION COMPLETE                         ║"
+    echo "╚════════════════════════════════════════════════════════════════╝"
+    echo ""
+    log_success "Freight Portal installed successfully!"
+    echo ""
+    echo "  Cloud Provider: ${CYAN}${CLOUD_PROVIDER}${NC}"
+    echo "  NPM Registry:   ${CYAN}$(npm config get registry)${NC}"
+    echo "  Access URL:     ${CYAN}http://$(curl -s ifconfig.me)/api/v1/health${NC}"
+    echo "  Log File:       ${CYAN}${LOG_FILE}${NC}"
+    echo ""
+    echo "  Useful commands:"
+    echo "    pm2 logs freight-portal     # View logs"
+    echo "    pm2 restart freight-portal  # Restart service"
+    echo "    pm2 status                  # Check status"
+    echo ""
+}
+
+main "$@"
