@@ -412,8 +412,6 @@ enum InvoiceStatus {
 
 // 索引优化
 model Shipment {
-  // ... existing fields ...
-  
   @@index([containerNo])
   @@index([companyId])
   @@index([status])
@@ -421,8 +419,6 @@ model Shipment {
 }
 
 model Order {
-  // ... existing fields ...
-  
   @@index([orderNo])
   @@index([companyId])
   @@index([status])
@@ -430,8 +426,6 @@ model Order {
 }
 
 model Bill {
-  // ... existing fields ...
-  
   @@index([billNo])
   @@index([companyId])
   @@index([status])
