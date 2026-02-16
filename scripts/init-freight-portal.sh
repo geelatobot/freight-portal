@@ -259,7 +259,7 @@ detect_cloud_provider() {
 # Mirror Configuration
 # =============================================================================
 
-configure_mirrors() {
+step_configure_mirrors() {
     local cloud=$1
     local os=$(detect_os)
 
@@ -399,8 +399,8 @@ step_download_code() {
     show_step "Download Source Code"
 
     # 根据云服务商选择最佳的 GitHub 镜像
+    local cloud=$1
     local github_mirror="https://github.com"
-    local cloud=$(detect_cloud_provider)
     
     case $cloud in
         aliyun|tencent|huawei)
@@ -423,15 +423,16 @@ step_download_code() {
         # 尝试使用镜像克隆
         if [ "$github_mirror" != "https://github.com" ]; then
             log_info "Trying mirror: $github_mirror"
-            if run_with_timeout 120 "git clone" git clone --depth 1 "${github_mirror}/geelatobot/freight-portal.git" "${PROJECT_DIR}/source"; then
-                # 克隆成功后，切换回官方源以便后续更新
-                cd "${PROJECT_DIR}/source"
-                git remote set-url origin https://github.com/geelatobot/freight-portal.git
-                show_success "Source code cloned from mirror"
-                return
-            else
-                log_warn "Mirror failed, trying official GitHub..."
+            if run_with_timeout 120 "git clone" git clone --depth 1 "${github_mirror}/geelatobot/freight-portal.git" "${PROJECT_DIR}/source" || true; then
+                if [ -d "${PROJECT_DIR}/source/.git" ]; then
+                    # 克隆成功后，切换回官方源以便后续更新
+                    cd "${PROJECT_DIR}/source"
+                    git remote set-url origin https://github.com/geelatobot/freight-portal.git
+                    show_success "Source code cloned from mirror"
+                    return
+                fi
             fi
+            log_warn "Mirror failed, trying official GitHub..."
         fi
         
         # 使用官方源
@@ -581,12 +582,16 @@ main() {
     log_info "Starting installation..."
     log_info "OS: $(detect_os)"
     log_info "Architecture: $(uname -m)"
+    
+    # 检测云服务商并保存到全局变量
+    CLOUD_PROVIDER=$(detect_cloud_provider)
+    log_info "Cloud Provider: $CLOUD_PROVIDER"
 
     step_check_config
-    step_configure_mirrors
+    step_configure_mirrors "$CLOUD_PROVIDER"
     step_install_system_deps
     step_install_nodejs
-    step_download_code
+    step_download_code "$CLOUD_PROVIDER"
     step_install_npm_deps
     step_database_migration
     step_build_application
