@@ -26,6 +26,7 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "prisma:seed": "ts-node prisma/seed.ts",
+    "prisma:validate": "prisma validate",
     "db:seed": "npx prisma db seed"
   },
   "prisma": {

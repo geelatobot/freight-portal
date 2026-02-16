@@ -419,11 +419,11 @@ step_database_migration() {
     show_success "Configuration copied"
 
     show_progress "Generating Prisma client"
-    npx prisma generate 2>&1 | tee -a "$LOG_FILE" | tail -5
+    npx prisma@5.7.0 generate 2>&1 | tee -a "$LOG_FILE" | tail -5
     show_success "Prisma client generated"
 
     show_progress "Running database migrations"
-    npx prisma migrate deploy 2>&1 | tee -a "$LOG_FILE"
+    npx prisma@5.7.0 migrate deploy 2>&1 | tee -a "$LOG_FILE"
     show_success "Database migrations complete"
 }
 
