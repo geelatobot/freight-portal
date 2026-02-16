@@ -1,0 +1,76 @@
+<!--index.wxml-->
+<view class="container">
+  <!-- 搜索区域 -->
+  <view class="search-section">
+    <view class="search-box">
+      <input 
+        class="search-input" 
+        placeholder="请输入集装箱号/提单号" 
+        value="{{containerNo}}"
+        bindinput="onInputChange"
+        confirm-type="search"
+        bindconfirm="onSearch"
+      />
+      <view class="scan-btn" bindtap="onScan">
+        <text class="icon">📷</text>
+      </view>
+    </view>
+    
+    <button class="search-btn" type="primary" bindtap="onSearch">查询</button>
+  </view>
+
+  <!-- 最近查询 -->
+  <view class="section" wx:if="{{recentSearches.length > 0}}">
+    <view class="section-title">最近查询</view>
+    <view class="tag-list">
+      <view 
+        class="tag" 
+        wx:for="{{recentSearches}}" 
+        wx:key="*this"
+        data-value="{{item}}"
+        bindtap="onRecentSearchTap"
+      >
+        {{item}}
+      </view>
+    </view>
+  </view>
+
+  <!-- 快捷入口 -->
+  <view class="section">
+    <view class="section-title">快捷入口</view>
+    <view class="quick-grid">
+      <view class="quick-item" bindtap="onSearch">
+        <view class="quick-icon">🔍</view>
+        <view class="quick-text">货物查询</view>
+      </view>
+      
+      <navigator url="/pages/orders/orders" class="quick-item">
+        <view class="quick-icon">📋</view>
+        <view class="quick-text">我的订单</view>
+      </navigator>
+      
+      <navigator url="/pages/billing/billing" class="quick-item">
+        <view class="quick-icon">💰</view>
+        <view class="quick-text">财务中心</view>
+      </navigator>
+      
+      <view class="quick-item">
+        <view class="quick-icon">📞</view>
+        <view class="quick-text">联系客服</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 通知列表 -->
+  <view class="section">
+    <view class="section-title">最新通知</view>
+    
+    <view class="notice-list">
+      <view class="notice-item" wx:for="{{notifications}}" wx:key="id">
+        <view class="notice-title">{{item.title}}</view>
+        <view class="notice-content">{{item.content}}</view>
+        <view class="notice-time">{{item.time}}</view>
+      </view>
+    </view>
+  </view>
+</view>

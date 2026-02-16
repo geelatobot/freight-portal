@@ -1,0 +1,11 @@
+{
+  "name": "freight-portal-miniapp",
+  "version": "1.0.0",
+  "description": "货代客户门户小程序",
+  "main": "app.js",
+  "scripts": {
+    "dev": "echo '请使用微信开发者工具打开项目'",
+    "build": "echo '请使用微信开发者工具构建'"
+  },
+  "dependencies": {}
+}

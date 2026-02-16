@@ -1,0 +1,438 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// 用户表
+model User {
+  id            String    @id @default(uuid())
+  username      String    @unique @db.VarChar(50)
+  email         String?   @unique @db.VarChar(100)
+  phone         String?   @unique @db.VarChar(20)
+  passwordHash  String    @map("password_hash") @db.VarChar(255)
+  realName      String?   @map("real_name") @db.VarChar(50)
+  avatar        String?   @db.VarChar(255)
+  status        UserStatus @default(ACTIVE)
+  lastLoginAt   DateTime? @map("last_login_at")
+  lastLoginIp   String?   @map("last_login_ip") @db.VarChar(50)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  
+  // 关联
+  companyUsers  CompanyUser[]
+  orders        Order[]
+  
+  @@map("users")
+}
+
+// 企业表
+model Company {
+  id              String    @id @default(uuid())
+  companyName     String    @map("company_name") @db.VarChar(100)
+  creditCode      String?   @map("credit_code") @unique @db.VarChar(50)
+  address         String?   @db.Text
+  contactName     String?   @map("contact_name") @db.VarChar(50)
+  contactPhone    String?   @map("contact_phone") @db.VarChar(20)
+  contactEmail    String?   @map("contact_email") @db.VarChar(100)
+  creditLimit     Decimal?  @map("credit_limit") @db.Decimal(15, 2)
+  creditUsed      Decimal   @default(0) @map("credit_used") @db.Decimal(15, 2)
+  status          CompanyStatus @default(PENDING)
+  remark          String?   @db.Text
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  
+  // 关联
+  companyUsers    CompanyUser[]
+  orders          Order[]
+  shipments       Shipment[]
+  bills           Bill[]
+  
+  @@map("companies")
+}
+
+// 用户企业关联表
+model CompanyUser {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  companyId   String    @map("company_id")
+  role        CompanyRole @default(OPERATOR)
+  isDefault   Boolean   @default(false) @map("is_default")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  
+  // 关联
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, companyId])
+  @@map("company_users")
+}
+
+// 订单表
+model Order {
+  id              String      @id @default(uuid())
+  orderNo         String      @unique @map("order_no") @db.VarChar(50)
+  companyId       String      @map("company_id")
+  creatorId       String      @map("creator_id")
+  type            OrderType
+  status          OrderStatus @default(PENDING)
+  subStatus       String?     @map("sub_status") @db.VarChar(50)
+  
+  // 港口信息
+  originPort      String      @map("origin_port") @db.VarChar(50)
+  originPortName  String      @map("origin_port_name") @db.VarChar(100)
+  destinationPort String      @map("destination_port") @db.VarChar(50)
+  destinationPortName String  @map("destination_port_name") @db.VarChar(100)
+  
+  // 货物信息
+  cargoDesc       String      @map("cargo_desc") @db.Text
+  cargoWeight     Decimal?    @map("cargo_weight") @db.Decimal(15, 3)
+  cargoVolume     Decimal?    @map("cargo_volume") @db.Decimal(15, 3)
+  cargoPackageType String?    @map("cargo_package_type") @db.VarChar(50)
+  cargoPackageCount Int?      @map("cargo_package_count")
+  
+  // 集装箱信息
+  containerType   String?     @map("container_type") @db.VarChar(20)
+  containerCount  Int?        @map("container_count")
+  
+  // 船舶信息
+  shipName        String?     @map("ship_name") @db.VarChar(100)
+  voyageNo        String?     @map("voyage_no") @db.VarChar(50)
+  
+  // 时间
+  etd             DateTime?
+  eta             DateTime?
+  atd             DateTime?
+  ata             DateTime?
+  
+  // 费用
+  totalAmount     Decimal?    @map("total_amount") @db.Decimal(15, 2)
+  currency        String?     @default("CNY") @db.VarChar(10)
+  
+  // 收发货人
+  shipperName     String?     @map("shipper_name") @db.VarChar(100)
+  shipperAddress  String?     @map("shipper_address") @db.Text
+  shipperContact  String?     @map("shipper_contact") @db.VarChar(50)
+  shipperPhone    String?     @map("shipper_phone") @db.VarChar(20)
+  
+  consigneeName   String?     @map("consignee_name") @db.VarChar(100)
+  consigneeAddress String?    @map("consignee_address") @db.Text
+  consigneeContact String?    @map("consignee_contact") @db.VarChar(50)
+  consigneePhone  String?     @map("consignee_phone") @db.VarChar(20)
+  
+  notifyName      String?     @map("notify_name") @db.VarChar(100)
+  notifyAddress   String?     @map("notify_address") @db.Text
+  notifyContact   String?     @map("notify_contact") @db.VarChar(50)
+  notifyPhone     String?     @map("notify_phone") @db.VarChar(20)
+  
+  remark          String?     @db.Text
+  internalRemark  String?     @map("internal_remark") @db.Text
+  
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+  
+  // 关联
+  company         Company     @relation(fields: [companyId], references: [id])
+  creator         User        @relation(fields: [creatorId], references: [id])
+  shipments       Shipment[]
+  bills           Bill[]
+  
+  @@map("orders")
+}
+
+// 货物表
+model Shipment {
+  id              String          @id @default(uuid())
+  shipmentNo      String          @unique @map("shipment_no") @db.VarChar(50)
+  orderId         String?         @map("order_id")
+  companyId       String          @map("company_id")
+  
+  // 集装箱信息
+  containerNo     String          @unique @map("container_no") @db.VarChar(50)
+  containerType   String          @map("container_type") @db.VarChar(20)
+  blNo            String?         @map("bl_no") @db.VarChar(50)
+  bookingNo       String?         @map("booking_no") @db.VarChar(50)
+  
+  // 船司信息
+  carrierCode     String?         @map("carrier_code") @db.VarChar(20)
+  carrierName     String?         @map("carrier_name") @db.VarChar(100)
+  
+  // 状态
+  status          ShipmentStatus  @default(BOOKED)
+  currentNode     String?         @map("current_node") @db.VarChar(50)
+  
+  // 港口信息
+  originPort      String          @map("origin_port") @db.VarChar(50)
+  originPortName  String          @map("origin_port_name") @db.VarChar(100)
+  destinationPort String          @map("destination_port") @db.VarChar(50)
+  destinationPortName String      @map("destination_port_name") @db.VarChar(100)
+  
+  // 时间
+  etd             DateTime?
+  eta             DateTime?
+  atd             DateTime?
+  ata             DateTime?
+  
+  // 4portun同步
+  syncSource      String?         @map("sync_source") @db.VarChar(50)
+  syncId          String?         @map("sync_id") @db.VarChar(100)
+  lastSyncAt      DateTime?       @map("last_sync_at")
+  
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  
+  // 关联
+  company         Company         @relation(fields: [companyId], references: [id])
+  order           Order?          @relation(fields: [orderId], references: [id])
+  nodes           ShipmentNode[]
+  
+  @@map("shipments")
+}
+
+// 货物节点表
+model ShipmentNode {
+  id            String    @id @default(uuid())
+  shipmentId    String    @map("shipment_id")
+  nodeCode      String    @map("node_code") @db.VarChar(50)
+  nodeName      String    @map("node_name") @db.VarChar(100)
+  location      String?   @db.VarChar(100)
+  locationCode  String?   @map("location_code") @db.VarChar(50)
+  eventTime     DateTime  @map("event_time")
+  description   String?   @db.Text
+  operator      String?   @db.VarChar(100)
+  source        String    @default("4portun") @db.VarChar(50)
+  rawData       Json?     @map("raw_data")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  
+  // 关联
+  shipment      Shipment  @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  
+  @@index([shipmentId, eventTime])
+  @@map("shipment_nodes")
+}
+
+// 账单表
+model Bill {
+  id            String      @id @default(uuid())
+  billNo        String      @unique @map("bill_no") @db.VarChar(50)
+  companyId     String      @map("company_id")
+  orderId       String?     @map("order_id")
+  
+  billType      BillType
+  status        BillStatus  @default(DRAFT)
+  
+  amount        Decimal     @db.Decimal(15, 2)
+  currency      String      @default("CNY") @db.VarChar(10)
+  
+  issueDate     DateTime?   @map("issue_date")
+  dueDate       DateTime?   @map("due_date")
+  paidDate      DateTime?   @map("paid_date")
+  paidAmount    Decimal?    @map("paid_amount") @db.Decimal(15, 2)
+  
+  remark        String?     @db.Text
+  
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+  
+  // 关联
+  company       Company     @relation(fields: [companyId], references: [id])
+  order         Order?      @relation(fields: [orderId], references: [id])
+  items         BillItem[]
+  invoice       Invoice?
+  
+  @@map("bills")
+}
+
+// 账单明细表
+model BillItem {
+  id            String    @id @default(uuid())
+  billId        String    @map("bill_id")
+  itemCode      String    @map("item_code") @db.VarChar(50)
+  itemName      String    @map("item_name") @db.VarChar(100)
+  quantity      Decimal   @db.Decimal(15, 3)
+  unit          String    @db.VarChar(20)
+  unitPrice     Decimal   @map("unit_price") @db.Decimal(15, 4)
+  amount        Decimal   @db.Decimal(15, 2)
+  currency      String    @default("CNY") @db.VarChar(10)
+  remark        String?   @db.Text
+  
+  // 关联
+  bill          Bill      @relation(fields: [billId], references: [id], onDelete: Cascade)
+  
+  @@map("bill_items")
+}
+
+// 发票表
+model Invoice {
+  id            String        @id @default(uuid())
+  invoiceNo     String        @unique @map("invoice_no") @db.VarChar(50)
+  billId        String        @unique @map("bill_id")
+  companyId     String        @map("company_id")
+  
+  invoiceType   InvoiceType
+  amount        Decimal       @db.Decimal(15, 2)
+  taxAmount     Decimal?      @map("tax_amount") @db.Decimal(15, 2)
+  totalAmount   Decimal       @map("total_amount") @db.Decimal(15, 2)
+  
+  status        InvoiceStatus @default(DRAFT)
+  issueDate     DateTime?     @map("issue_date")
+  downloadUrl   String?       @map("download_url") @db.VarChar(500)
+  
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  
+  // 关联
+  bill          Bill          @relation(fields: [billId], references: [id])
+  
+  @@map("invoices")
+}
+
+// 系统配置表
+model SystemConfig {
+  id          String    @id @default(uuid())
+  configKey   String    @unique @map("config_key") @db.VarChar(100)
+  configValue String    @map("config_value") @db.Text
+  description String?   @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  
+  @@map("system_configs")
+}
+
+// 操作日志表
+model OperationLog {
+  id          String    @id @default(uuid())
+  userId      String?   @map("user_id")
+  companyId   String?   @map("company_id")
+  module      String    @db.VarChar(50)
+  action      String    @db.VarChar(50)
+  resourceType String   @map("resource_type") @db.VarChar(50)
+  resourceId  String?   @map("resource_id") @db.VarChar(100)
+  requestData Json?     @map("request_data")
+  responseData Json?    @map("response_data")
+  ip          String?   @db.VarChar(50)
+  userAgent   String?   @map("user_agent") @db.Text
+  duration    Int?      // 毫秒
+  status      String    @db.VarChar(20)
+  errorMsg    String?   @map("error_msg") @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at")
+  
+  @@index([userId, createdAt])
+  @@index([companyId, createdAt])
+  @@map("operation_logs")
+}
+
+// 枚举定义
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  LOCKED
+}
+
+enum CompanyStatus {
+  PENDING    // 待审核
+  ACTIVE     // 正常
+  SUSPENDED  // 暂停
+  REJECTED   // 拒绝
+}
+
+enum CompanyRole {
+  ADMIN      // 企业管理员
+  OPERATOR   // 业务操作员
+  FINANCE    // 财务人员
+  READONLY   // 只读用户
+}
+
+enum OrderType {
+  FCL        // 整箱
+  LCL        // 拼箱
+  AIR        // 空运
+  LAND       // 陆运
+  MULTIMODAL // 多式联运
+}
+
+enum OrderStatus {
+  PENDING     // 待确认
+  CONFIRMED   // 已确认
+  PROCESSING  // 执行中
+  COMPLETED   // 已完成
+  CANCELLED   // 已取消
+  REJECTED    // 已拒绝
+}
+
+enum ShipmentStatus {
+  BOOKED      // 已订舱
+  EMPTY_PICKUP // 提空箱
+  GATE_IN     // 进港
+  CUSTOMS_RELEASED // 海关放行
+  TERMINAL_RELEASED // 码头放行
+  DEPARTURE   // 离港
+  ARRIVAL     // 抵港
+  DISCHARGED  // 卸船
+  FULL_PICKUP // 提重箱
+  EMPTY_RETURN // 还空箱
+  COMPLETED   // 已完成
+}
+
+enum BillType {
+  FREIGHT     // 运费
+  AGENCY      // 代理费
+  CUSTOMS     // 报关费
+  INSURANCE   // 保险费
+  OTHER       // 其他
+}
+
+enum BillStatus {
+  DRAFT       // 草稿
+  ISSUED      // 已开具
+  PARTIAL_PAID // 部分支付
+  PAID        // 已支付
+  OVERDUE     // 逾期
+  CANCELLED   // 已取消
+}
+
+enum InvoiceType {
+  VAT_SPECIAL     // 增值税专用发票
+  VAT_NORMAL      // 增值税普通发票
+  PROFORMA        // 形式发票
+  COMMERCIAL      // 商业发票
+}
+
+enum InvoiceStatus {
+  DRAFT       // 草稿
+  ISSUED      // 已开具
+  SENT        // 已发送
+  RECEIVED    // 已接收
+  CANCELLED   // 已作废
+}
+
+// 索引优化
+model Shipment {
+  // ... existing fields ...
+  
+  @@index([containerNo])
+  @@index([companyId])
+  @@index([status])
+  @@index([currentNode])
+}
+
+model Order {
+  // ... existing fields ...
+  
+  @@index([orderNo])
+  @@index([companyId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Bill {
+  // ... existing fields ...
+  
+  @@index([billNo])
+  @@index([companyId])
+  @@index([status])
+}

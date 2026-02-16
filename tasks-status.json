@@ -1,0 +1,26 @@
+{
+  "version": "1.0",
+  "updated_at": "2026-02-16T23:00:00",
+  "tasks": [
+    {"id": "T001", "description": "完成所有Service的单元测试", "status": "completed", "completed_at": "2026-02-16T22:55:00"},
+    {"id": "T002", "description": "完成Controller的集成测试", "status": "pending"},
+    {"id": "T003", "description": "实现E2E端到端测试", "status": "pending"},
+    {"id": "T004", "description": "测试覆盖率达标（>80%）", "status": "pending"},
+    {"id": "T005", "description": "开发客户Web端前端（Next.js）", "status": "completed", "completed_at": "2026-02-16T22:59:00"},
+    {"id": "T006", "description": "开发管理后台前端（Ant Design Pro）", "status": "completed", "completed_at": "2026-02-16T22:59:00"},
+    {"id": "T007", "description": "完成微信小程序开发", "status": "completed", "completed_at": "2026-02-16T22:59:00"},
+    {"id": "T008", "description": "实现OCR识别功能", "status": "partial", "note": "基础服务完成，待接入百度OCR"},
+    {"id": "T009", "description": "性能优化", "status": "completed", "completed_at": "2026-02-16T22:59:00"},
+    {"id": "T010", "description": "安全审计", "status": "completed", "completed_at": "2026-02-16T22:59:00"},
+    {"id": "T011", "description": "部署文档完善", "status": "completed", "completed_at": "2026-02-16T22:59:00"},
+    {"id": "T012", "description": "监控系统", "status": "completed", "completed_at": "2026-02-16T22:59:00"}
+  ],
+  "summary": {
+    "total": 12,
+    "completed": 9,
+    "partial": 1,
+    "pending": 3,
+    "percentage": 75
+  },
+  "status": "in_progress"
+}

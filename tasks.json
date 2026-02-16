@@ -1,0 +1,117 @@
+{
+  "version": "1.0",
+  "created_at": "2026-02-16T22:55:00",
+  "tasks": [
+    {
+      "id": "T001",
+      "description": "完成所有Service的单元测试（Auth, Customer, Order, Shipment, Billing, AI）",
+      "category": "测试",
+      "priority": "P0",
+      "status": "pending",
+      "created_at": "2026-02-16T22:55:00",
+      "completed_at": null
+    },
+    {
+      "id": "T002",
+      "description": "完成Controller的集成测试",
+      "category": "测试",
+      "priority": "P0",
+      "status": "pending",
+      "created_at": "2026-02-16T22:55:00",
+      "completed_at": null
+    },
+    {
+      "id": "T003",
+      "description": "实现E2E端到端测试",
+      "category": "测试",
+      "priority": "P0",
+      "status": "pending",
+      "created_at": "2026-02-16T22:55:00",
+      "completed_at": null
+    },
+    {
+      "id": "T004",
+      "description": "测试覆盖率达标（>80%）",
+      "category": "测试",
+      "priority": "P0",
+      "status": "pending",
+      "created_at": "2026-02-16T22:55:00",
+      "completed_at": null
+    },
+    {
+      "id": "T005",
+      "description": "开发客户Web端前端（Next.js）",
+      "category": "前端",
+      "priority": "P0",
+      "status": "pending",
+      "created_at": "2026-02-16T22:55:00",
+      "completed_at": null
+    },
+    {
+      "id": "T006",
+      "description": "开发管理后台前端（Ant Design Pro）",
+      "category": "前端",
+      "priority": "P0",
+      "status": "pending",
+      "created_at": "2026-02-16T22:55:00",
+      "completed_at": null
+    },
+    {
+      "id": "T007",
+      "description": "完成微信小程序开发",
+      "category": "前端",
+      "priority": "P1",
+      "status": "pending",
+      "created_at": "2026-02-16T22:55:00",
+      "completed_at": null
+    },
+    {
+      "id": "T008",
+      "description": "实现OCR识别功能（提单/发票）",
+      "category": "功能",
+      "priority": "P2",
+      "status": "pending",
+      "created_at": "2026-02-16T22:55:00",
+      "completed_at": null
+    },
+    {
+      "id": "T009",
+      "description": "性能优化（数据库索引、缓存）",
+      "category": "优化",
+      "priority": "P1",
+      "status": "pending",
+      "created_at": "2026-02-16T22:55:00",
+      "completed_at": null
+    },
+    {
+      "id": "T010",
+      "description": "安全审计（输入验证、SQL注入防护）",
+      "category": "安全",
+      "priority": "P0",
+      "status": "pending",
+      "created_at": "2026-02-16T22:55:00",
+      "completed_at": null
+    },
+    {
+      "id": "T011",
+      "description": "部署文档完善（含故障排查）",
+      "category": "文档",
+      "priority": "P1",
+      "status": "pending",
+      "created_at": "2026-02-16T22:55:00",
+      "completed_at": null
+    },
+    {
+      "id": "T012",
+      "description": "监控系统（日志、告警）",
+      "category": "运维",
+      "priority": "P2",
+      "status": "pending",
+      "created_at": "2026-02-16T22:55:00",
+      "completed_at": null
+    }
+  ],
+  "completed_count": 0,
+  "total_count": 12,
+  "status": "running"
+}
