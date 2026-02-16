@@ -270,8 +270,6 @@ step_configure_mirrors() {
             log_info "Using Alibaba Cloud mirrors"
             # npm使用阿里云镜像
             npm config set registry https://registry.npmmirror.com
-            npm config set disturl https://npmmirror.com/dist
-            npm config set electron_mirror https://npmmirror.com/mirrors/electron/
             # apt使用阿里云镜像
             if [ "$os" = "ubuntu" ] || [ "$os" = "debian" ]; then
                 sed -i 's|http://.*archive.ubuntu.com|http://mirrors.aliyun.com|g' /etc/apt/sources.list 2>/dev/null || true
@@ -282,7 +280,6 @@ step_configure_mirrors() {
         tencent)
             log_info "Using Tencent Cloud mirrors"
             npm config set registry https://mirrors.cloud.tencent.com/npm/
-            npm config set disturl https://mirrors.cloud.tencent.com/nodejs-release/
             if [ "$os" = "ubuntu" ] || [ "$os" = "debian" ]; then
                 sed -i 's|http://.*archive.ubuntu.com|http://mirrors.tencentyun.com|g' /etc/apt/sources.list 2>/dev/null || true
                 sed -i 's|http://.*security.ubuntu.com|http://mirrors.tencentyun.com|g' /etc/apt/sources.list 2>/dev/null || true
@@ -291,7 +288,6 @@ step_configure_mirrors() {
         huawei)
             log_info "Using Huawei Cloud mirrors"
             npm config set registry https://mirrors.huaweicloud.com/repository/npm/
-            npm config set disturl https://mirrors.huaweicloud.com/nodejs/
             if [ "$os" = "ubuntu" ] || [ "$os" = "debian" ]; then
                 sed -i 's|http://.*archive.ubuntu.com|https://repo.huaweicloud.com|g' /etc/apt/sources.list 2>/dev/null || true
             fi
@@ -299,12 +295,10 @@ step_configure_mirrors() {
         *)
             log_info "Using default mirrors (Taobao npm)"
             npm config set registry https://registry.npmmirror.com
-            npm config set disturl https://npmmirror.com/dist
             ;;
     esac
 
     log_info "NPM registry: $(npm config get registry)"
-    log_info "NPM disturl: $(npm config get disturl)"
 }
 
 # =============================================================================
