@@ -355,14 +355,6 @@ EXAMPLE
     log_debug "Database URL: ${DATABASE_URL//:*@/:***@}"
 }
 
-step_configure_mirrors() {
-    show_step "Configure Mirrors"
-    CLOUD_PROVIDER=$(detect_cloud_provider)
-    log_info "Detected cloud provider: $CLOUD_PROVIDER"
-    configure_mirrors "$CLOUD_PROVIDER"
-    show_success "Mirrors configured"
-}
-
 step_install_system_deps() {
     show_step "Install System Dependencies"
 
