@@ -391,14 +391,44 @@ step_install_nodejs() {
 step_download_code() {
     show_step "Download Source Code"
 
+    # 根据云服务商选择最佳的 GitHub 镜像
+    local github_mirror="https://github.com"
+    local cloud=$(detect_cloud_provider)
+    
+    case $cloud in
+        aliyun|tencent|huawei)
+            # 国内服务器使用 ghproxy 加速
+            github_mirror="https://ghproxy.com/https://github.com"
+            log_info "Using GitHub mirror for China: ghproxy.com"
+            ;;
+    esac
+
     if [ -d "${PROJECT_DIR}/source/.git" ]; then
         show_progress "Updating existing code"
         cd "${PROJECT_DIR}/source"
+        # 更新时切换回官方源
+        git remote set-url origin https://github.com/geelatobot/freight-portal.git
         run_with_timeout 60 "git pull" git pull origin main
     else
-        show_progress "Cloning repository"
+        show_progress "Cloning repository (may take 1-2 minutes)..."
         mkdir -p "$PROJECT_DIR"
-        run_with_timeout 120 "git clone" git clone --depth 1 https://github.com/geelatobot/freight-portal.git "${PROJECT_DIR}/source"
+        
+        # 尝试使用镜像克隆
+        if [ "$github_mirror" != "https://github.com" ]; then
+            log_info "Trying mirror: $github_mirror"
+            if run_with_timeout 120 "git clone" git clone --depth 1 "${github_mirror}/geelatobot/freight-portal.git" "${PROJECT_DIR}/source"; then
+                # 克隆成功后，切换回官方源以便后续更新
+                cd "${PROJECT_DIR}/source"
+                git remote set-url origin https://github.com/geelatobot/freight-portal.git
+                show_success "Source code cloned from mirror"
+                return
+            else
+                log_warn "Mirror failed, trying official GitHub..."
+            fi
+        fi
+        
+        # 使用官方源
+        run_with_timeout 180 "git clone" git clone --depth 1 https://github.com/geelatobot/freight-portal.git "${PROJECT_DIR}/source"
     fi
     show_success "Source code ready"
 }
