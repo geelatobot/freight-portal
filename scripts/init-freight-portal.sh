@@ -173,8 +173,6 @@ run_with_timeout() {
     local message="$2"
     shift 2
     local pid
-    local spin='⣾⣽⣻⢿⡿⣟⣯⣷'
-    local i=0
 
     show_progress "$message"
     log_debug "Executing: $*"
@@ -183,18 +181,27 @@ run_with_timeout() {
     "$@" &
     pid=$!
 
-    # Show spinner while waiting
+    # Wait with simple spinner
+    local count=0
     while kill -0 $pid 2>/dev/null; do
-        printf "\r    %s %s" "${spin:$i:1}" "$message"
-        i=$(((i + 1) % 8))
+        count=$((count + 1))
+        if [ $count -gt 600 ]; then  # 60 seconds timeout for spinner
+            break
+        fi
         sleep 0.1
     done
 
-    printf "\r    ✓ %s    \n" "$message"
+    echo ""
 
     # Get exit code
     wait $pid
-    return $?
+    local exit_code=$?
+    
+    if [ $exit_code -eq 0 ]; then
+        printf "    [OK] %s\n" "$message"
+    fi
+    
+    return $exit_code
 }
 
 # =============================================================================
