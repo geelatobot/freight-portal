@@ -141,6 +141,10 @@ model Order {
   shipments       Shipment[]
   bills           Bill[]
   
+  @@index([orderNo])
+  @@index([companyId])
+  @@index([status])
+  @@index([createdAt])
   @@map("orders")
 }
 
@@ -190,6 +194,10 @@ model Shipment {
   order           Order?          @relation(fields: [orderId], references: [id])
   nodes           ShipmentNode[]
   
+  @@index([containerNo])
+  @@index([companyId])
+  @@index([status])
+  @@index([currentNode])
   @@map("shipments")
 }
 
@@ -244,6 +252,9 @@ model Bill {
   items         BillItem[]
   invoice       Invoice?
   
+  @@index([billNo])
+  @@index([companyId])
+  @@index([status])
   @@map("bills")
 }
 
@@ -408,25 +419,4 @@ enum InvoiceStatus {
   SENT        // 已发送
   RECEIVED    // 已接收
   CANCELLED   // 已作废
-}
-
-// 索引优化
-model Shipment {
-  @@index([containerNo])
-  @@index([companyId])
-  @@index([status])
-  @@index([currentNode])
-}
-
-model Order {
-  @@index([orderNo])
-  @@index([companyId])
-  @@index([status])
-  @@index([createdAt])
-}
-
-model Bill {
-  @@index([billNo])
-  @@index([companyId])
-  @@index([status])
 }
