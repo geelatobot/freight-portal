@@ -146,7 +146,7 @@ for i in 1 2 3; do
         echo -e "新版本: ${YELLOW}$VERSION${NC}"
         echo -e "旧版本: ${YELLOW}$CURRENT_VERSION${NC}（保留，可回滚）"
         echo ""
-        echo -e "访问地址: ${YELLOW}http://47.121.179.53/api/v1/health${NC}"
+        echo -e "访问地址: ${YELLOW}http://$(curl -s ifconfig.me 2>/dev/null || echo 'your-server-ip')/api/v1/health${NC}"
         echo ""
         exit 0
     fi
