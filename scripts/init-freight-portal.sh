@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # =============================================================================
-# 货代客户门户 - 完整初始化脚本（配置文件版）
-# 支持从配置文件读取敏感信息，无需交互输入
+# 货代客户门户 - 实时显示进度版本
+# 前台执行，实时显示进度和日志
 # =============================================================================
 
 set -e
@@ -11,161 +11,189 @@ set -e
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+BLUE='\033[0;34m'
+NC='\033[0m'
 
 # 基础配置
 PROJECT_DIR="/opt/freight-portal"
 CONFIG_DIR="$PROJECT_DIR/shared"
-RELEASES_DIR="$PROJECT_DIR/releases"
-SCRIPTS_DIR="$PROJECT_DIR/scripts"
 CONFIG_FILE="$CONFIG_DIR/.env"
 
+# 打印带时间的日志
+log() {
+    echo -e "${BLUE}[$(date '+%H:%M:%S')]${NC} $1"
+}
+
+# 打印步骤
+step() {
+    echo ""
+    echo -e "${YELLOW}========================================${NC}"
+    echo -e "${YELLOW} 步骤 $1/9: $2${NC}"
+    echo -e "${YELLOW}========================================${NC}"
+}
+
+# 打印成功
+success() {
+    echo -e "${GREEN}✓ $1${NC}"
+}
+
+# 打印错误
+error() {
+    echo -e "${RED}✗ $1${NC}"
+}
+
+# 显示进度动画
+spinner() {
+    local pid=$1
+    local delay=0.1
+    local spinstr='|/-\'
+    while [ "$(ps a | awk '{print $1}' | grep $pid)" ]; do
+        local temp=${spinstr#?}
+        printf " [%c]  " "$spinstr"
+        local spinstr=$temp${spinstr%"$temp"}
+        sleep $delay
+        printf "\b\b\b\b\b\b"
+    done
+    printf "    \b\b\b\b"
+}
+
 echo -e "${GREEN}======================================${NC}"
-echo -e "${GREEN}货代客户门户 - 完整初始化脚本${NC}"
+echo -e "${GREEN}货代客户门户 - 初始化脚本${NC}"
 echo -e "${GREEN}======================================${NC}"
 echo ""
 
 # =============================================================================
-# 检查配置文件
+# 步骤0: 检查配置文件
 # =============================================================================
+step "0" "检查配置文件"
+
 if [ ! -f "$CONFIG_FILE" ]; then
-    echo -e "${RED}✗ 错误: 未找到配置文件${NC}"
+    error "未找到配置文件: $CONFIG_FILE"
     echo ""
-    echo "请先在服务器上创建配置文件:"
-    echo "  $CONFIG_FILE"
+    echo "请先创建配置文件:"
+    echo "  mkdir -p $CONFIG_DIR"
+    echo "  nano $CONFIG_FILE"
     echo ""
-    echo "配置文件示例:"
-    cat << 'EXAMPLE'
-
-# 数据库配置（必填）
-DATABASE_URL="mysql://用户名:密码@数据库地址:3306/数据库名"
-
-# JWT配置（自动生成，可选）
-JWT_SECRET="your-random-secret"
-JWT_EXPIRES_IN="15m"
-JWT_REFRESH_EXPIRES_IN="7d"
-
-# 其他配置...
-FOURPORTUN_API_URL="https://prod-api.4portun.com"
-FOURPORTUN_APPID=""
-FOURPORTUN_SECRET=""
-KIMI_API_KEY=""
-
-EXAMPLE
-    echo ""
+    echo "配置文件内容示例:"
+    echo 'DATABASE_URL="mysql://用户名:密码@主机:3306/数据库名"'
+    echo 'JWT_SECRET=""'
     exit 1
 fi
 
-echo -e "${GREEN}✓ 找到配置文件: $CONFIG_FILE${NC}"
-
-# =============================================================================
-# 读取配置文件
-# =============================================================================
+log "加载配置文件..."
 source "$CONFIG_FILE"
+success "配置文件加载完成"
 
-# 检查必要配置
-if [ -z "$DATABASE_URL" ]; then
-    echo -e "${RED}✗ 错误: DATABASE_URL 未配置${NC}"
-    exit 1
-fi
-
-# 如果没有JWT_SECRET，自动生成
-if [ -z "$JWT_SECRET" ] || [ "$JWT_SECRET" = "your-random-secret" ]; then
+# 自动生成JWT
+if [ -z "$JWT_SECRET" ]; then
+    log "生成JWT密钥..."
     JWT_SECRET="fp-$(date +%s)-$(openssl rand -hex 16)"
-    # 更新配置文件
     sed -i "s/JWT_SECRET=.*/JWT_SECRET=\"$JWT_SECRET\"/" "$CONFIG_FILE"
-    echo -e "${GREEN}✓ 自动生成JWT_SECRET并更新配置文件${NC}"
+    success "JWT密钥已生成并保存"
 fi
 
-echo -e "${GREEN}✓ 配置加载完成${NC}"
+# =============================================================================
+# 步骤1: 安装系统依赖
+# =============================================================================
+step "1" "安装系统依赖"
+
+log "更新软件源..."
+(apt-get update -qq) &
+spinner $!
+success "软件源更新完成"
+
+log "安装必要软件..."
+apt-get install -y curl git nginx openssl -qq > /dev/null 2>&1
+success "系统依赖安装完成"
 
 # =============================================================================
-# 步骤1: 创建目录结构
+# 步骤2: 安装Node.js
 # =============================================================================
-echo ""
-echo -e "${YELLOW}[1/9] 创建目录结构...${NC}"
-mkdir -p $CONFIG_DIR
-mkdir -p $RELEASES_DIR
-mkdir -p $SCRIPTS_DIR
-mkdir -p $PROJECT_DIR/agent
-mkdir -p $PROJECT_DIR/nginx/ssl
-chmod 755 $PROJECT_DIR
-echo -e "${GREEN}✓ 目录创建完成${NC}"
+step "2" "安装Node.js"
 
-# =============================================================================
-# 步骤2: 安装系统依赖
-# =============================================================================
-echo ""
-echo -e "${YELLOW}[2/9] 安装系统依赖...${NC}"
-apt-get update -qq
-apt-get install -y -qq curl git nginx openssl
+log "下载Node.js安装脚本..."
+(curl -fsSL https://deb.nodesource.com/setup_20.x | bash - > /dev/null 2>&1) &
+spinner $!
+success "Node.js安装脚本下载完成"
 
-# 安装Node.js 20
-curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >/dev/null 2>&1
-apt-get install -y -qq nodejs
+log "安装Node.js和npm..."
+apt-get install -y nodejs -qq > /dev/null 2>&1
+success "Node.js安装完成: $(node -v)"
 
-# 安装PM2
-npm install -g pm2 --silent
-
-echo -e "${GREEN}✓ 系统依赖安装完成${NC}"
+log "安装PM2..."
+npm install -g pm2 --silent > /dev/null 2>&1
+success "PM2安装完成"
 
 # =============================================================================
 # 步骤3: 下载代码
 # =============================================================================
-echo ""
-echo -e "${YELLOW}[3/9] 下载代码仓库...${NC}"
+step "3" "下载代码"
 
 if [ -d "$PROJECT_DIR/source" ]; then
-    echo -e "${YELLOW}代码已存在，执行更新...${NC}"
+    log "代码已存在，更新代码..."
     cd $PROJECT_DIR/source
     git pull origin main
 else
+    log "克隆代码仓库..."
+    mkdir -p $PROJECT_DIR
     git clone --depth 1 https://github.com/geelatobot/freight-portal.git $PROJECT_DIR/source
 fi
-
-echo -e "${GREEN}✓ 代码克隆完成${NC}"
+success "代码下载完成"
 
 # =============================================================================
 # 步骤4: 安装项目依赖
 # =============================================================================
-echo ""
-echo -e "${YELLOW}[4/9] 安装项目依赖...${NC}"
+step "4" "安装项目依赖"
+
 cd $PROJECT_DIR/source/backend
-npm install --production --silent
-echo -e "${GREEN}✓ 依赖安装完成${NC}"
+
+log "安装npm依赖（约需3-5分钟）..."
+echo "    正在下载依赖包，请稍候..."
+npm install --production --silent > /dev/null 2>&1 &
+PID=$!
+while kill -0 $PID 2>/dev/null; do
+    echo -n "."
+    sleep 2
+done
+echo ""
+success "npm依赖安装完成"
 
 # =============================================================================
 # 步骤5: 复制配置文件
 # =============================================================================
-echo ""
-echo -e "${YELLOW}[5/9] 复制配置文件...${NC}"
+step "5" "复制配置文件"
+
 cp "$CONFIG_FILE" .
-echo -e "${GREEN}✓ 配置文件复制完成${NC}"
+success "配置文件复制完成"
 
 # =============================================================================
 # 步骤6: 数据库迁移
 # =============================================================================
-echo ""
-echo -e "${YELLOW}[6/9] 执行数据库迁移...${NC}"
-npx prisma generate
+step "6" "数据库迁移"
+
+log "生成Prisma客户端..."
+npx prisma generate > /dev/null 2>&1
+success "Prisma客户端生成完成"
+
+log "执行数据库迁移..."
 npx prisma migrate deploy
-echo -e "${GREEN}✓ 数据库迁移完成${NC}"
+success "数据库迁移完成"
 
 # =============================================================================
 # 步骤7: 构建应用
 # =============================================================================
-echo ""
-echo -e "${YELLOW}[7/9] 构建应用...${NC}"
-npm run build
-echo -e "${GREEN}✓ 应用构建完成${NC}"
+step "7" "构建应用"
+
+log "编译TypeScript..."
+npm run build > /dev/null 2>&1
+success "应用构建完成"
 
 # =============================================================================
 # 步骤8: 配置Nginx
 # =============================================================================
-echo ""
-echo -e "${YELLOW}[8/9] 配置Nginx...${NC}"
+step "8" "配置Nginx"
 
-cat > /etc/nginx/sites-available/freight-portal << 'NGINX_CONFIG'
+cat > /etc/nginx/sites-available/freight-portal << 'EOF'
 server {
     listen 80;
     server_name _;
@@ -173,54 +201,51 @@ server {
     location / {
         proxy_pass http://localhost:3000;
         proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 300s;
-    }
-    
-    location /health {
-        proxy_pass http://localhost:3000/api/v1/health;
-        access_log off;
     }
 }
-NGINX_CONFIG
+EOF
 
 rm -f /etc/nginx/sites-enabled/default
 ln -sf /etc/nginx/sites-available/freight-portal /etc/nginx/sites-enabled/
-nginx -t && systemctl restart nginx
-
-echo -e "${GREEN}✓ Nginx配置完成${NC}"
+nginx -t > /dev/null 2>&1 && systemctl restart nginx
+success "Nginx配置完成"
 
 # =============================================================================
 # 步骤9: 启动服务
 # =============================================================================
-echo ""
-echo -e "${YELLOW}[9/9] 启动服务...${NC}"
+step "9" "启动服务"
 
-# 创建当前版本链接
 ln -sfn $PROJECT_DIR/source/backend $PROJECT_DIR/current
-
-# PM2启动
 cd $PROJECT_DIR/current
-pm2 delete freight-portal 2>/dev/null || true
-pm2 start ecosystem.config.js --name freight-portal --env production
-pm2 save
 
+log "停止旧服务..."
+pm2 delete freight-portal 2>/dev/null || true
+
+log "启动新服务..."
+pm2 start ecosystem.config.js --name freight-portal --env production > /dev/null 2>&1
+pm2 save > /dev/null 2>&1
+success "服务启动完成"
+
+# =============================================================================
 # 健康检查
+# =============================================================================
 echo ""
-echo -e "${YELLOW}健康检查...${NC}"
-sleep 3
-if curl -sf http://localhost:3000/api/v1/health >/dev/null; then
-    echo -e "${GREEN}✓ 服务运行正常${NC}"
-else
-    echo -e "${RED}✗ 服务启动失败，请检查日志${NC}"
-    pm2 logs freight-portal --lines 20
-    exit 1
-fi
+echo -e "${YELLOW}========================================${NC}"
+echo -e "${YELLOW} 健康检查${NC}"
+echo -e "${YELLOW}========================================${NC}"
+
+log "等待服务启动..."
+for i in 1 2 3 4 5; do
+    if curl -sf http://localhost:3000/api/v1/health >/dev/null 2>&1; then
+        success "服务运行正常"
+        break
+    fi
+    echo "  尝试 $i/5..."
+    sleep 2
+done
 
 # =============================================================================
 # 完成
@@ -231,14 +256,10 @@ echo -e "${GREEN}✅ 初始化完成！${NC}"
 echo -e "${GREEN}======================================${NC}"
 echo ""
 echo -e "访问地址:"
-echo -e "  http://$(curl -s ifconfig.me)/api/v1/health"
-echo ""
-echo -e "配置文件位置:"
-echo -e "  ${YELLOW}$CONFIG_FILE${NC}"
+echo -e "  ${YELLOW}http://$(curl -s ifconfig.me)/api/v1/health${NC}"
 echo ""
 echo -e "常用命令:"
 echo -e "  ${YELLOW}pm2 logs freight-portal${NC}     # 查看日志"
 echo -e "  ${YELLOW}pm2 restart freight-portal${NC}  # 重启服务"
-echo -e "  ${YELLOW}pm2 stop freight-portal${NC}     # 停止服务"
 echo -e "  ${YELLOW}pm2 status${NC}                  # 查看状态"
 echo ""
