@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # =============================================================================
-# 货代客户门户 - 实时显示进度版本
-# 前台执行，实时显示进度和日志
+# 货代客户门户 - 智能镜像加速版
+# 自动检测云服务商并使用对应镜像
 # =============================================================================
 
 set -e
@@ -12,6 +12,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m'
 
 # 基础配置
@@ -28,7 +29,7 @@ log() {
 step() {
     echo ""
     echo -e "${YELLOW}========================================${NC}"
-    echo -e "${YELLOW} 步骤 $1/9: $2${NC}"
+    echo -e "${YELLOW} 步骤 $1/10: $2${NC}"
     echo -e "${YELLOW}========================================${NC}"
 }
 
@@ -37,9 +38,9 @@ success() {
     echo -e "${GREEN}✓ $1${NC}"
 }
 
-# 打印错误
-error() {
-    echo -e "${RED}✗ $1${NC}"
+# 打印信息
+info() {
+    echo -e "${CYAN}ℹ $1${NC}"
 }
 
 # 显示进度动画
@@ -57,26 +58,117 @@ spinner() {
     printf "    \b\b\b\b"
 }
 
+# =============================================================================
+# 检测云服务商
+# =============================================================================
+detect_cloud_provider() {
+    log "检测云服务商..."
+    
+    # 检测阿里云
+    if curl -s --connect-timeout 2 http://100.100.100.200/latest/meta-data/ 2>/dev/null | grep -q "instance-id"; then
+        echo "aliyun"
+        return
+    fi
+    
+    # 检测腾讯云
+    if curl -s --connect-timeout 2 http://metadata.tencentyun.com/latest/meta-data/ 2>/dev/null | grep -q "instance-id"; then
+        echo "tencent"
+        return
+    fi
+    
+    # 检测华为云
+    if curl -s --connect-timeout 2 http://169.254.169.254/latest/meta-data/ 2>/dev/null | grep -q "instance-id"; then
+        echo "huawei"
+        return
+    fi
+    
+    # 检测AWS
+    if curl -s --connect-timeout 2 http://169.254.169.254/latest/meta-data/ 2>/dev/null | grep -q "instance-id"; then
+        echo "aws"
+        return
+    fi
+    
+    # 检测Azure
+    if curl -s --connect-timeout 2 http://169.254.169.254/metadata/instance?api-version=2021-02-01 2>/dev/null | grep -q "compute"; then
+        echo "azure"
+        return
+    fi
+    
+    # 默认
+    echo "unknown"
+}
+
+# =============================================================================
+# 配置镜像源
+# =============================================================================
+setup_mirrors() {
+    local cloud=$1
+    
+    step "2" "配置镜像源 ($cloud)"
+    
+    case $cloud in
+        aliyun)
+            info "检测到阿里云服务器，使用阿里云镜像"
+            # npm使用阿里云镜像
+            npm config set registry https://registry.npmmirror.com
+            # apt使用阿里云镜像
+            sed -i 's/archive.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list 2>/dev/null || true
+            sed -i 's/security.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list 2>/dev/null || true
+            sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list 2>/dev/null || true
+            ;;
+        tencent)
+            info "检测到腾讯云服务器，使用腾讯云镜像"
+            npm config set registry https://mirrors.cloud.tencent.com/npm/
+            sed -i 's/archive.ubuntu.com/mirrors.tencent.com/g' /etc/apt/sources.list 2>/dev/null || true
+            sed -i 's/security.ubuntu.com/mirrors.tencent.com/g' /etc/apt/sources.list 2>/dev/null || true
+            ;;
+        huawei)
+            info "检测到华为云服务器，使用华为云镜像"
+            npm config set registry https://mirrors.huaweicloud.com/repository/npm/
+            sed -i 's/archive.ubuntu.com/repo.huaweicloud.com/g' /etc/apt/sources.list 2>/dev/null || true
+            ;;
+        aws)
+            info "检测到AWS服务器，使用官方镜像"
+            npm config set registry https://registry.npmjs.org/
+            ;;
+        azure)
+            info "检测到Azure服务器，使用官方镜像"
+            npm config set registry https://registry.npmjs.org/
+            ;;
+        *)
+            info "未检测到云服务商，使用国内默认镜像（淘宝npm）"
+            npm config set registry https://registry.npmmirror.com
+            ;;
+    esac
+    
+    success "镜像源配置完成"
+    log "npm registry: $(npm config get registry)"
+}
+
+# =============================================================================
+# 主程序开始
+# =============================================================================
 echo -e "${GREEN}======================================${NC}"
-echo -e "${GREEN}货代客户门户 - 初始化脚本${NC}"
+echo -e "${GREEN}货代客户门户 - 智能镜像加速版${NC}"
 echo -e "${GREEN}======================================${NC}"
 echo ""
 
-# =============================================================================
 # 步骤0: 检查配置文件
-# =============================================================================
 step "0" "检查配置文件"
 
 if [ ! -f "$CONFIG_FILE" ]; then
-    error "未找到配置文件: $CONFIG_FILE"
+    echo -e "${RED}✗ 错误: 未找到配置文件${NC}"
     echo ""
     echo "请先创建配置文件:"
     echo "  mkdir -p $CONFIG_DIR"
     echo "  nano $CONFIG_FILE"
     echo ""
     echo "配置文件内容示例:"
-    echo 'DATABASE_URL="mysql://用户名:密码@主机:3306/数据库名"'
-    echo 'JWT_SECRET=""'
+    cat << 'EXAMPLE'
+DATABASE_URL="mysql://用户名:密码@主机:3306/数据库名"
+JWT_SECRET=""
+JWT_EXPIRES_IN="15m"
+EOF
     exit 1
 fi
 
@@ -92,10 +184,12 @@ if [ -z "$JWT_SECRET" ]; then
     success "JWT密钥已生成并保存"
 fi
 
-# =============================================================================
-# 步骤1: 安装系统依赖
-# =============================================================================
-step "1" "安装系统依赖"
+# 步骤1: 检测云服务商并配置镜像
+CLOUD_PROVIDER=$(detect_cloud_provider)
+setup_mirrors "$CLOUD_PROVIDER"
+
+# 步骤3: 安装系统依赖
+step "3" "安装系统依赖"
 
 log "更新软件源..."
 (apt-get update -qq) &
@@ -106,10 +200,8 @@ log "安装必要软件..."
 apt-get install -y curl git nginx openssl -qq > /dev/null 2>&1
 success "系统依赖安装完成"
 
-# =============================================================================
-# 步骤2: 安装Node.js
-# =============================================================================
-step "2" "安装Node.js"
+# 步骤4: 安装Node.js
+step "4" "安装Node.js"
 
 log "下载Node.js安装脚本..."
 (curl -fsSL https://deb.nodesource.com/setup_20.x | bash - > /dev/null 2>&1) &
@@ -124,10 +216,8 @@ log "安装PM2..."
 npm install -g pm2 --silent > /dev/null 2>&1
 success "PM2安装完成"
 
-# =============================================================================
-# 步骤3: 下载代码
-# =============================================================================
-step "3" "下载代码"
+# 步骤5: 下载代码
+step "5" "下载代码"
 
 if [ -d "$PROJECT_DIR/source" ]; then
     log "代码已存在，更新代码..."
@@ -140,36 +230,25 @@ else
 fi
 success "代码下载完成"
 
-# =============================================================================
-# 步骤4: 安装项目依赖
-# =============================================================================
-step "4" "安装项目依赖"
+# 步骤6: 安装项目依赖
+step "6" "安装项目依赖"
 
 cd $PROJECT_DIR/source/backend
 
-log "安装npm依赖（约需3-5分钟）..."
-echo "    正在下载依赖包，请稍候..."
-npm install --production --silent > /dev/null 2>&1 &
-PID=$!
-while kill -0 $PID 2>/dev/null; do
-    echo -n "."
-    sleep 2
-done
-echo ""
+log "安装npm依赖（使用镜像加速）..."
+echo "    当前镜像: $(npm config get registry)"
+echo "    正在下载，请稍候..."
+npm install --production 2>&1 | grep -E "(added|packages|warn|err)" || true
 success "npm依赖安装完成"
 
-# =============================================================================
-# 步骤5: 复制配置文件
-# =============================================================================
-step "5" "复制配置文件"
+# 步骤7: 复制配置文件
+step "7" "复制配置文件"
 
 cp "$CONFIG_FILE" .
 success "配置文件复制完成"
 
-# =============================================================================
-# 步骤6: 数据库迁移
-# =============================================================================
-step "6" "数据库迁移"
+# 步骤8: 数据库迁移
+step "8" "数据库迁移"
 
 log "生成Prisma客户端..."
 npx prisma generate > /dev/null 2>&1
@@ -179,19 +258,15 @@ log "执行数据库迁移..."
 npx prisma migrate deploy
 success "数据库迁移完成"
 
-# =============================================================================
-# 步骤7: 构建应用
-# =============================================================================
-step "7" "构建应用"
+# 步骤9: 构建应用
+step "9" "构建应用"
 
 log "编译TypeScript..."
 npm run build > /dev/null 2>&1
 success "应用构建完成"
 
-# =============================================================================
-# 步骤8: 配置Nginx
-# =============================================================================
-step "8" "配置Nginx"
+# 步骤10: 配置Nginx和启动
+step "10" "配置Nginx和启动"
 
 cat > /etc/nginx/sites-available/freight-portal << 'EOF'
 server {
@@ -213,11 +288,6 @@ ln -sf /etc/nginx/sites-available/freight-portal /etc/nginx/sites-enabled/
 nginx -t > /dev/null 2>&1 && systemctl restart nginx
 success "Nginx配置完成"
 
-# =============================================================================
-# 步骤9: 启动服务
-# =============================================================================
-step "9" "启动服务"
-
 ln -sfn $PROJECT_DIR/source/backend $PROJECT_DIR/current
 cd $PROJECT_DIR/current
 
@@ -229,9 +299,7 @@ pm2 start ecosystem.config.js --name freight-portal --env production > /dev/null
 pm2 save > /dev/null 2>&1
 success "服务启动完成"
 
-# =============================================================================
 # 健康检查
-# =============================================================================
 echo ""
 echo -e "${YELLOW}========================================${NC}"
 echo -e "${YELLOW} 健康检查${NC}"
@@ -239,7 +307,7 @@ echo -e "${YELLOW}========================================${NC}"
 
 log "等待服务启动..."
 for i in 1 2 3 4 5; do
-    if curl -sf http://localhost:3000/api/v1/health >/dev/null 2>&1; then
+    if curl -sf http://localhost:3000/api/v1/health > /dev/null 2>&1; then
         success "服务运行正常"
         break
     fi
@@ -247,13 +315,14 @@ for i in 1 2 3 4 5; do
     sleep 2
 done
 
-# =============================================================================
 # 完成
-# =============================================================================
 echo ""
 echo -e "${GREEN}======================================${NC}"
 echo -e "${GREEN}✅ 初始化完成！${NC}"
 echo -e "${GREEN}======================================${NC}"
+echo ""
+echo -e "云服务商: ${CYAN}$CLOUD_PROVIDER${NC}"
+echo -e "npm镜像: ${CYAN}$(npm config get registry)${NC}"
 echo ""
 echo -e "访问地址:"
 echo -e "  ${YELLOW}http://$(curl -s ifconfig.me)/api/v1/health${NC}"
