@@ -599,18 +599,19 @@ step_install_npm_deps() {
     npm config set fetch-retry-maxtimeout 120000
     
     show_progress "Installing all npm packages (including dev dependencies)..."
+    log_info "This may take 3-5 minutes, please wait..."
     
     # 安装所有依赖（包括开发依赖，用于构建）
     if [ -f "package-lock.json" ]; then
-        npm ci --progress=false 2>&1 | tee -a "$LOG_FILE"
+        npm ci 2>&1 | tee -a "$LOG_FILE"
     else
-        npm install --progress=false 2>&1 | tee -a "$LOG_FILE"
+        npm install 2>&1 | tee -a "$LOG_FILE"
     fi
     
     # 验证 nest 命令是否存在
     if [ ! -f "./node_modules/.bin/nest" ]; then
         log_warn "Nest CLI not found in node_modules, installing @nestjs/cli..."
-        npm install --save-dev @nestjs/cli --progress=false 2>&1 | tee -a "$LOG_FILE"
+        npm install --save-dev @nestjs/cli 2>&1 | tee -a "$LOG_FILE"
     fi
     
     show_success "NPM dependencies installed"
