@@ -598,40 +598,32 @@ step_install_npm_deps() {
     npm config set fetch-retry-mintimeout 20000
     npm config set fetch-retry-maxtimeout 120000
     
-    show_progress "Installing all npm packages (including dev dependencies)..."
+    show_progress "Installing production npm packages..."
     log_info "This may take 3-5 minutes, please wait..."
     
-    # 强制安装所有依赖（包括开发依赖），忽略 NODE_ENV
+    # 安装生产依赖
     if [ -f "package-lock.json" ]; then
-        NODE_ENV=development npm ci 2>&1 | tee -a "$LOG_FILE" || {
+        npm ci --production 2>&1 | tee -a "$LOG_FILE" || {
             log_error "npm ci failed"
             exit 1
         }
     else
-        NODE_ENV=development npm install 2>&1 | tee -a "$LOG_FILE" || {
+        npm install --production 2>&1 | tee -a "$LOG_FILE" || {
             log_error "npm install failed"
             exit 1
         }
     fi
     
-    # 验证 nest 命令是否存在
-    if [ ! -f "./node_modules/.bin/nest" ]; then
-        log_warn "Nest CLI not found in node_modules, installing @nestjs/cli..."
-        NODE_ENV=development npm install --save-dev @nestjs/cli 2>&1 | tee -a "$LOG_FILE" || {
-            log_error "Failed to install @nestjs/cli"
-            exit 1
-        }
-    fi
+    show_success "Production dependencies installed"
     
-    # 再次验证
-    if [ ! -f "./node_modules/.bin/nest" ]; then
-        log_error "Nest CLI still not found after installation"
-        log_info "Checking node_modules contents..."
-        ls -la node_modules/.bin/ 2>&1 | head -20 | tee -a "$LOG_FILE"
+    # 安装构建工具（全局安装，不修改 package.json）
+    show_progress "Installing build tools (@nestjs/cli)..."
+    npm install -g @nestjs/cli 2>&1 | tee -a "$LOG_FILE" || {
+        log_error "Failed to install @nestjs/cli globally"
         exit 1
-    fi
+    }
     
-    show_success "NPM dependencies installed"
+    show_success "Build tools installed"
 }
 
 step_database_migration() {
@@ -667,13 +659,8 @@ step_build_application() {
     cd "${PROJECT_DIR}/source/backend"
 
     show_progress "Compiling TypeScript"
-    # 使用本地安装的 nest 命令
-    if [ -f "./node_modules/.bin/nest" ]; then
-        ./node_modules/.bin/nest build 2>&1 | tee -a "$LOG_FILE" | tail -10
-    else
-        log_error "Nest CLI not found. Please check npm install."
-        exit 1
-    fi
+    # 使用全局安装的 nest 命令
+    nest build 2>&1 | tee -a "$LOG_FILE" | tail -10
     show_success "Application built successfully"
 }
 
