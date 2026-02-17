@@ -647,8 +647,13 @@ step_build_application() {
     cd "${PROJECT_DIR}/source/backend"
 
     show_progress "Compiling TypeScript"
-    # 使用 npx 运行 nest，确保能找到命令
-    npx nest build 2>&1 | tee -a "$LOG_FILE" | tail -10
+    # 使用本地安装的 nest 命令
+    if [ -f "./node_modules/.bin/nest" ]; then
+        ./node_modules/.bin/nest build 2>&1 | tee -a "$LOG_FILE" | tail -10
+    else
+        log_error "Nest CLI not found. Please check npm install."
+        exit 1
+    fi
     show_success "Application built successfully"
 }
 
