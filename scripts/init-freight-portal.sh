@@ -12,7 +12,7 @@ set -o pipefail
 # =============================================================================
 # Configuration
 # =============================================================================
-readonly SCRIPT_VERSION="2.0.0"
+readonly SCRIPT_VERSION="2.1.0"
 readonly SCRIPT_NAME="freight-portal-installer"
 readonly PROJECT_DIR="/opt/freight-portal"
 readonly CONFIG_DIR="${PROJECT_DIR}/shared"
@@ -256,6 +256,54 @@ detect_cloud_provider() {
 }
 
 # =============================================================================
+# GitHub Mirror Selection
+# =============================================================================
+
+# 可用的GitHub镜像列表（按优先级排序）
+declare -a GITHUB_MIRRORS=(
+    "https://ghps.cc/https://github.com"
+    "https://gh.api.99988866.xyz/https://github.com"
+    "https://kkgithub.com"
+    "https://github.com"
+)
+
+# 测试GitHub镜像可用性
+test_github_mirror() {
+    local mirror="$1"
+    local test_url="${mirror}/geelatobot/freight-portal.git"
+    
+    log_debug "Testing mirror: $mirror"
+    
+    # 使用git ls-remote测试连接
+    if timeout 10 git ls-remote --exit-code "$test_url" HEAD > /dev/null 2>&1; then
+        log_info "Mirror available: $mirror"
+        return 0
+    else
+        log_warn "Mirror unavailable: $mirror"
+        return 1
+    fi
+}
+
+# 获取可用的GitHub镜像
+get_available_github_mirror() {
+    local cloud="$1"
+    
+    # 如果是国内云服务商，优先测试镜像
+    if [[ "$cloud" =~ ^(aliyun|tencent|huawei)$ ]]; then
+        log_info "Testing GitHub mirrors for China..."
+        for mirror in "${GITHUB_MIRRORS[@]}"; do
+            if test_github_mirror "$mirror"; then
+                echo "$mirror"
+                return 0
+            fi
+        done
+        log_warn "All mirrors failed, falling back to direct GitHub"
+    fi
+    
+    echo "https://github.com"
+}
+
+# =============================================================================
 # Mirror Configuration
 # =============================================================================
 
@@ -334,6 +382,7 @@ EXAMPLE
 
     show_progress "Loading configuration"
     set -a
+    # shellcheck source=/dev/null
     source "$CONFIG_FILE"
     set +a
     show_success "Configuration loaded"
@@ -342,7 +391,12 @@ EXAMPLE
     if [ -z "${JWT_SECRET:-}" ]; then
         show_progress "Generating JWT secret"
         JWT_SECRET="fp-$(date +%s)-$(openssl rand -hex 16)"
-        sed -i "s/JWT_SECRET=.*/JWT_SECRET=\"$JWT_SECRET\"/" "$CONFIG_FILE"
+        # 使用更健壮的sed替换
+        if grep -q "^JWT_SECRET=" "$CONFIG_FILE"; then
+            sed -i "s/^JWT_SECRET=.*/JWT_SECRET=\"$JWT_SECRET\"/" "$CONFIG_FILE"
+        else
+            echo "JWT_SECRET=\"$JWT_SECRET\"" >> "$CONFIG_FILE"
+        fi
         show_success "JWT secret generated and saved"
     fi
 
@@ -384,17 +438,12 @@ step_install_nodejs() {
 step_download_code() {
     show_step "Download Source Code"
 
-    # 根据云服务商选择最佳的 GitHub 镜像
+    # 获取可用的GitHub镜像
     local cloud=$1
-    local github_mirror="https://github.com"
+    local github_mirror
+    github_mirror=$(get_available_github_mirror "$cloud")
     
-    case $cloud in
-        aliyun|tencent|huawei)
-            # 国内服务器使用 ghproxy 加速
-            github_mirror="https://ghproxy.com/https://github.com"
-            log_info "Using GitHub mirror for China: ghproxy.com"
-            ;;
-    esac
+    log_info "Using GitHub mirror: $github_mirror"
 
     if [ -d "${PROJECT_DIR}/source/.git" ]; then
         show_progress "Updating existing code"
