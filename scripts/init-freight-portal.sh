@@ -602,13 +602,14 @@ step_install_npm_deps() {
     log_info "This may take 3-5 minutes, please wait..."
     
     # 安装所有依赖（包括 devDependencies，用于构建）
+    # 使用 --production=false 强制安装 devDependencies
     if [ -f "package-lock.json" ]; then
-        npm ci 2>&1 | tee -a "$LOG_FILE" || {
+        npm ci --production=false 2>&1 | tee -a "$LOG_FILE" || {
             log_error "npm ci failed"
             exit 1
         }
     else
-        npm install 2>&1 | tee -a "$LOG_FILE" || {
+        npm install --production=false 2>&1 | tee -a "$LOG_FILE" || {
             log_error "npm install failed"
             exit 1
         }
