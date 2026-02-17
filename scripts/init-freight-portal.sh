@@ -30,7 +30,7 @@ readonly GRAY='\033[0;37m'
 readonly NC='\033[0m'
 
 # Counters
-TOTAL_STEPS=12
+TOTAL_STEPS=11
 CURRENT_STEP=0
 
 # =============================================================================
@@ -617,16 +617,6 @@ step_install_npm_deps() {
     show_success "All dependencies installed"
 }
 
-step_prune_dev_deps() {
-    show_step "Prune Dev Dependencies"
-    
-    cd "${PROJECT_DIR}/source/backend"
-    
-    show_progress "Removing dev dependencies for production..."
-    npm prune --production 2>&1 | tee -a "$LOG_FILE"
-    show_success "Dev dependencies removed"
-}
-
 step_database_migration() {
     show_step "Database Migration"
 
@@ -659,9 +649,9 @@ step_build_application() {
 
     cd "${PROJECT_DIR}/source/backend"
 
-    show_progress "Compiling TypeScript"
-    # 使用本地安装的 nest 命令
-    ./node_modules/.bin/nest build 2>&1 | tee -a "$LOG_FILE" | tail -10
+    show_progress "Compiling TypeScript (production mode)..."
+    # 使用生产模式构建
+    NODE_ENV=production ./node_modules/.bin/nest build 2>&1 | tee -a "$LOG_FILE" | tail -10
     show_success "Application built successfully"
 }
 
@@ -768,7 +758,6 @@ main() {
     step_install_npm_deps
     step_database_migration
     step_build_application
-    step_prune_dev_deps
     step_configure_nginx
     step_start_service
     step_health_check
