@@ -600,12 +600,16 @@ step_install_npm_deps() {
     
     show_progress "Installing npm packages (this may take 3-5 minutes)..."
     
-    # 使用 npm ci 如果有 package-lock.json，否则使用 npm install
+    # 首先安装生产依赖
     if [ -f "package-lock.json" ]; then
         npm ci --production --progress=false 2>&1 | tee -a "$LOG_FILE" | grep -E "(added|packages|warn|ERR!)" || true
     else
         npm install --production --progress=false 2>&1 | tee -a "$LOG_FILE" | grep -E "(added|packages|warn|ERR!)" || true
     fi
+    
+    # 安装开发依赖用于构建（@nestjs/cli 等）
+    show_progress "Installing dev dependencies for build..."
+    npm install --progress=false 2>&1 | tee -a "$LOG_FILE" | grep -E "(added|packages|warn|ERR!)" || true
     
     show_success "NPM dependencies installed"
 }
@@ -643,7 +647,8 @@ step_build_application() {
     cd "${PROJECT_DIR}/source/backend"
 
     show_progress "Compiling TypeScript"
-    npm run build 2>&1 | tee -a "$LOG_FILE" | tail -10
+    # 使用 npx 运行 nest，确保能找到命令
+    npx nest build 2>&1 | tee -a "$LOG_FILE" | tail -10
     show_success "Application built successfully"
 }
 
