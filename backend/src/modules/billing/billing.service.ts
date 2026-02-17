@@ -194,10 +194,10 @@ export class BillingService {
       throw new NotFoundException('账单不存在');
     }
 
-    const newPaidAmount = (bill.paidAmount || 0) + paidAmount;
-    let status = BillStatus.PARTIAL_PAID;
+    const newPaidAmount = Number(bill.paidAmount || 0) + paidAmount;
+    let status: BillStatus = BillStatus.PARTIAL_PAID;
 
-    if (newPaidAmount >= bill.amount) {
+    if (newPaidAmount >= Number(bill.amount)) {
       status = BillStatus.PAID;
     }
 
@@ -251,7 +251,7 @@ export class BillingService {
       totalBills,
       totalAmount: totalAmount._sum.amount || 0,
       paidAmount: paidAmount._sum.paidAmount || 0,
-      unpaidAmount: (totalAmount._sum.amount || 0) - (paidAmount._sum.paidAmount || 0),
+      unpaidAmount: Number(totalAmount._sum.amount || 0) - Number(paidAmount._sum.paidAmount || 0),
       overdueBills,
     };
   }

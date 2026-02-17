@@ -258,7 +258,8 @@ export class OrderService {
     }
 
     // 只能取消待确认或已确认的订单
-    if (![OrderStatus.PENDING, OrderStatus.CONFIRMED].includes(order.status)) {
+    const cancellableStatuses = [OrderStatus.PENDING, OrderStatus.CONFIRMED];
+    if (!cancellableStatuses.includes(order.status as typeof cancellableStatuses[number])) {
       throw new ForbiddenException('当前状态不能取消订单');
     }
 

@@ -34,7 +34,7 @@ export class ShipmentService {
     
     if (needSync) {
       try {
-        shipment = await this.syncService.syncContainer(containerNo, companyId);
+        await this.syncService.syncContainer(containerNo, companyId);
         // 重新查询以获取完整数据
         shipment = await this.prisma.shipment.findUnique({
           where: { containerNo },

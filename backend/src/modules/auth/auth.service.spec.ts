@@ -92,12 +92,12 @@ describe('AuthService', () => {
       };
 
       jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(null);
-      jest.spyOn(prisma, '$transaction').mockImplementation(async (callback) => {
+      jest.spyOn(prisma, '$transaction').mockImplementation(async (callback: any) => {
         return callback({
           company: { create: jest.fn().mockResolvedValue({ id: '1', companyName: 'Test Co' }) },
           user: { create: jest.fn().mockResolvedValue(mockUser) },
           companyUser: { create: jest.fn() },
-        });
+        } as any);
       });
 
       const result = await service.register({

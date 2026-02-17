@@ -185,14 +185,14 @@ export class AuthService {
       username: user.username,
     };
 
-    const accessToken = jwt.sign(payload, this.jwtSecret, {
-      expiresIn: this.jwtExpiresIn,
+    const accessToken = jwt.sign(payload, this.jwtSecret as jwt.Secret, {
+      expiresIn: this.jwtExpiresIn as any,
     });
 
     const refreshToken = jwt.sign(
       { sub: user.id, type: 'refresh' },
-      this.jwtSecret,
-      { expiresIn: this.jwtRefreshExpiresIn },
+      this.jwtSecret as jwt.Secret,
+      { expiresIn: this.jwtRefreshExpiresIn as any },
     );
 
     return {

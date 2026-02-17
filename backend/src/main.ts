@@ -25,7 +25,7 @@ async function bootstrap() {
   });
   
   // 全局管道
-  app.useGlobalPipe(
+  app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       transform: true,

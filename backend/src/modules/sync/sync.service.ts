@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, ShipmentStatus } from '@prisma/client';
 import { FourPortunService } from './fourportun.service';
 
 @Injectable()
@@ -57,7 +57,7 @@ export class SyncService {
         eta: eta ? new Date(eta) : null,
         atd: atd ? new Date(atd) : null,
         ata: ata ? new Date(ata) : null,
-        status: this.mapStatus(status),
+        status: this.mapStatus(status) as ShipmentStatus,
         currentNode: nodes?.[nodes.length - 1]?.nodeCode,
         syncSource: '4portun',
         lastSyncAt: new Date(),
@@ -79,7 +79,7 @@ export class SyncService {
         eta: eta ? new Date(eta) : null,
         atd: atd ? new Date(atd) : null,
         ata: ata ? new Date(ata) : null,
-        status: this.mapStatus(status),
+        status: this.mapStatus(status) as ShipmentStatus,
         currentNode: nodes?.[nodes.length - 1]?.nodeCode,
         syncSource: '4portun',
         lastSyncAt: new Date(),
