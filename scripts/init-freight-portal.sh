@@ -448,8 +448,23 @@ step_download_code() {
     if [ -d "${PROJECT_DIR}/source/.git" ]; then
         show_progress "Updating existing code"
         cd "${PROJECT_DIR}/source"
-        # 更新时切换回官方源
-        git remote set-url origin https://github.com/geelatobot/freight-portal.git
+        
+        # 如果是国内服务器，优先使用镜像更新
+        if [[ "$cloud" =~ ^(aliyun|tencent|huawei)$ ]] && [ "$github_mirror" != "https://github.com" ]; then
+            log_info "Using mirror for update: $github_mirror"
+            git remote set-url origin "${github_mirror}/geelatobot/freight-portal.git"
+            if run_with_timeout 60 "git pull" git pull origin main; then
+                # 更新成功后切换回官方源
+                git remote set-url origin https://github.com/geelatobot/freight-portal.git
+                show_success "Source code updated from mirror"
+                return
+            else
+                log_warn "Mirror update failed, trying official GitHub..."
+                git remote set-url origin https://github.com/geelatobot/freight-portal.git
+            fi
+        fi
+        
+        # 使用官方源更新
         run_with_timeout 60 "git pull" git pull origin main
     else
         show_progress "Cloning repository (may take 1-2 minutes)..."
