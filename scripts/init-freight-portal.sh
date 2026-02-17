@@ -30,7 +30,7 @@ readonly GRAY='\033[0;37m'
 readonly NC='\033[0m'
 
 # Counters
-TOTAL_STEPS=10
+TOTAL_STEPS=11
 CURRENT_STEP=0
 
 # =============================================================================
@@ -476,6 +476,101 @@ step_download_code() {
     show_success "Source code ready"
 }
 
+# =============================================================================
+# Prisma Schema Check and Fix
+# =============================================================================
+
+step_check_and_fix_schema() {
+    show_step "Check and Fix Prisma Schema"
+
+    local schema_file="${PROJECT_DIR}/source/backend/prisma/schema.prisma"
+    
+    if [ ! -f "$schema_file" ]; then
+        log_warn "Schema file not found, skipping check"
+        return 0
+    fi
+
+    show_progress "Checking for duplicate model definitions"
+    
+    # 需要检查的模型列表
+    local models=("Shipment" "Order" "Bill" "User" "Company" "Customer" "ShipmentNode" "Document" "BillItem" "Invoice" "Payment" "AuditLog" "ApiLog" "SystemConfig" "Notification" "RefreshToken")
+    
+    local has_duplicate=false
+    local duplicate_models=""
+    
+    for model in "${models[@]}"; do
+        local count
+        count=$(grep -c "^model $model {" "$schema_file" 2>/dev/null || echo 0)
+        if [ "$count" -gt 1 ]; then
+            log_error "Model '$model' is defined $count times"
+            has_duplicate=true
+            duplicate_models="$duplicate_models $model"
+        fi
+    done
+    
+    if [ "$has_duplicate" = true ]; then
+        show_progress "Found duplicate models, attempting to fix"
+        
+        # 备份原文件
+        cp "$schema_file" "${schema_file}.bak.$(date +%Y%m%d%H%M%S)"
+        
+        # 查找并删除从 "// 索引优化" 或类似注释开始的重复定义块
+        # 这些通常是 execute-all-tasks.sh 旧版本添加的
+        local temp_file="${schema_file}.tmp"
+        
+        # 使用 awk 删除重复：保留第一个模型定义，删除后面的
+        awk '
+            /^model [A-Za-z]+ \{/ {
+                model_name = $2
+                if (models[model_name]) {
+                    # 跳过这个模型及其所有内容直到下一个模型或枚举
+                    skip = 1
+                    next
+                }
+                models[model_name] = 1
+            }
+            skip && /^model [A-Za-z]+ \{/ {
+                # 遇到新模型，停止跳过
+                skip = 0
+                model_name = $2
+                if (models[model_name]) {
+                    skip = 1
+                    next
+                }
+                models[model_name] = 1
+            }
+            skip && /^enum [A-Za-z]+ \{/ {
+                # 遇到枚举，停止跳过
+                skip = 0
+            }
+            !skip { print }
+        ' "$schema_file" > "$temp_file"
+        
+        # 检查修复后的文件
+        local still_has_duplicate=false
+        for model in "${models[@]}"; do
+            local count_after
+            count_after=$(grep -c "^model $model {" "$temp_file" 2>/dev/null || echo 0)
+            if [ "$count_after" -gt 1 ]; then
+                log_error "Model '$model' still has $count_after definitions after fix attempt"
+                still_has_duplicate=true
+            fi
+        done
+        
+        if [ "$still_has_duplicate" = false ]; then
+            mv "$temp_file" "$schema_file"
+            show_success "Schema fixed - duplicate models removed"
+        else
+            rm -f "$temp_file"
+            log_error "Automatic fix failed, please check schema manually"
+            log_info "Backup saved at: ${schema_file}.bak.*"
+            exit 1
+        fi
+    else
+        show_success "Schema is clean - no duplicate models"
+    fi
+}
+
 step_install_npm_deps() {
     show_step "Install NPM Dependencies"
 
@@ -627,6 +722,7 @@ main() {
     step_install_system_deps
     step_install_nodejs
     step_download_code "$CLOUD_PROVIDER"
+    step_check_and_fix_schema
     step_install_npm_deps
     step_database_migration
     step_build_application
