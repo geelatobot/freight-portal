@@ -603,15 +603,32 @@ step_install_npm_deps() {
     
     # 安装所有依赖（包括开发依赖，用于构建）
     if [ -f "package-lock.json" ]; then
-        npm ci 2>&1 | tee -a "$LOG_FILE"
+        npm ci 2>&1 | tee -a "$LOG_FILE" || {
+            log_error "npm ci failed"
+            exit 1
+        }
     else
-        npm install 2>&1 | tee -a "$LOG_FILE"
+        npm install 2>&1 | tee -a "$LOG_FILE" || {
+            log_error "npm install failed"
+            exit 1
+        }
     fi
     
     # 验证 nest 命令是否存在
     if [ ! -f "./node_modules/.bin/nest" ]; then
         log_warn "Nest CLI not found in node_modules, installing @nestjs/cli..."
-        npm install --save-dev @nestjs/cli 2>&1 | tee -a "$LOG_FILE"
+        npm install --save-dev @nestjs/cli 2>&1 | tee -a "$LOG_FILE" || {
+            log_error "Failed to install @nestjs/cli"
+            exit 1
+        }
+    fi
+    
+    # 再次验证
+    if [ ! -f "./node_modules/.bin/nest" ]; then
+        log_error "Nest CLI still not found after installation"
+        log_info "Checking node_modules contents..."
+        ls -la node_modules/.bin/ 2>&1 | head -20 | tee -a "$LOG_FILE"
+        exit 1
     fi
     
     show_success "NPM dependencies installed"
