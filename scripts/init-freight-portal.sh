@@ -620,11 +620,20 @@ step_database_migration() {
     show_success "Configuration copied"
 
     show_progress "Generating Prisma client"
-    npx prisma@5.7.0 generate 2>&1 | tee -a "$LOG_FILE" | tail -5
+    # 使用本地安装的 prisma，避免 npx 版本问题
+    if [ -f "./node_modules/.bin/prisma" ]; then
+        ./node_modules/.bin/prisma generate 2>&1 | tee -a "$LOG_FILE" | tail -5
+    else
+        npx prisma generate 2>&1 | tee -a "$LOG_FILE" | tail -5
+    fi
     show_success "Prisma client generated"
 
     show_progress "Running database migrations"
-    npx prisma@5.7.0 migrate deploy 2>&1 | tee -a "$LOG_FILE"
+    if [ -f "./node_modules/.bin/prisma" ]; then
+        ./node_modules/.bin/prisma migrate deploy 2>&1 | tee -a "$LOG_FILE"
+    else
+        npx prisma migrate deploy 2>&1 | tee -a "$LOG_FILE"
+    fi
     show_success "Database migrations complete"
 }
 
