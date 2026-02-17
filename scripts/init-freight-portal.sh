@@ -30,7 +30,7 @@ readonly GRAY='\033[0;37m'
 readonly NC='\033[0m'
 
 # Counters
-TOTAL_STEPS=11
+TOTAL_STEPS=12
 CURRENT_STEP=0
 
 # =============================================================================
@@ -598,32 +598,33 @@ step_install_npm_deps() {
     npm config set fetch-retry-mintimeout 20000
     npm config set fetch-retry-maxtimeout 120000
     
-    show_progress "Installing production npm packages..."
+    show_progress "Installing all npm packages (for build)..."
     log_info "This may take 3-5 minutes, please wait..."
     
-    # 安装生产依赖
+    # 安装所有依赖（包括 devDependencies，用于构建）
     if [ -f "package-lock.json" ]; then
-        npm ci --production 2>&1 | tee -a "$LOG_FILE" || {
+        npm ci 2>&1 | tee -a "$LOG_FILE" || {
             log_error "npm ci failed"
             exit 1
         }
     else
-        npm install --production 2>&1 | tee -a "$LOG_FILE" || {
+        npm install 2>&1 | tee -a "$LOG_FILE" || {
             log_error "npm install failed"
             exit 1
         }
     fi
     
-    show_success "Production dependencies installed"
+    show_success "All dependencies installed"
+}
+
+step_prune_dev_deps() {
+    show_step "Prune Dev Dependencies"
     
-    # 安装构建工具（全局安装，不修改 package.json）
-    show_progress "Installing build tools (@nestjs/cli)..."
-    npm install -g @nestjs/cli 2>&1 | tee -a "$LOG_FILE" || {
-        log_error "Failed to install @nestjs/cli globally"
-        exit 1
-    }
+    cd "${PROJECT_DIR}/source/backend"
     
-    show_success "Build tools installed"
+    show_progress "Removing dev dependencies for production..."
+    npm prune --production 2>&1 | tee -a "$LOG_FILE"
+    show_success "Dev dependencies removed"
 }
 
 step_database_migration() {
@@ -659,8 +660,8 @@ step_build_application() {
     cd "${PROJECT_DIR}/source/backend"
 
     show_progress "Compiling TypeScript"
-    # 使用全局安装的 nest 命令
-    nest build 2>&1 | tee -a "$LOG_FILE" | tail -10
+    # 使用本地安装的 nest 命令
+    ./node_modules/.bin/nest build 2>&1 | tee -a "$LOG_FILE" | tail -10
     show_success "Application built successfully"
 }
 
@@ -767,6 +768,7 @@ main() {
     step_install_npm_deps
     step_database_migration
     step_build_application
+    step_prune_dev_deps
     step_configure_nginx
     step_start_service
     step_health_check
