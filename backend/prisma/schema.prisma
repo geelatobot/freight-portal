@@ -219,6 +219,7 @@ model ShipmentNode {
   // 关联
   shipment      Shipment  @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
   
+  @@unique([shipmentId, nodeCode, eventTime])
   @@index([shipmentId, eventTime])
   @@map("shipment_nodes")
 }
