@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaClient } from '@prisma/client';
 import axios from 'axios';
 
 @Injectable()
 export class NotifyService {
+  private readonly logger = new Logger(NotifyService.name);
   private readonly wechatAppId: string;
   private readonly wechatSecret: string;
 
@@ -37,7 +38,7 @@ export class NotifyService {
 
       return response.data;
     } catch (error) {
-      console.error('发送微信消息失败:', error);
+      this.logger.error('发送微信消息失败:', error);
       throw error;
     }
   }
@@ -58,7 +59,7 @@ export class NotifyService {
 
     if (!user || !user.email) {
       // 如果没有绑定微信，记录日志
-      console.log(`用户 ${userId} 未绑定微信，跳过通知`);
+      this.logger.debug(`用户 ${userId} 未绑定微信，跳过通知`);
       return;
     }
 
@@ -74,14 +75,14 @@ export class NotifyService {
     // await this.sendMiniProgramMessage(openid, 'shipment_status_template_id', templateData);
 
     // 记录通知日志
-    console.log(`发送货物状态通知: ${containerNo} - ${status}`);
+    this.logger.log(`发送货物状态通知: ${containerNo} - ${status}`);
   }
 
   /**
    * 发送账单通知
    */
   async sendBillNotification(userId: string, billNo: string, amount: number) {
-    console.log(`发送账单通知: ${billNo} - ${amount}`);
+    this.logger.log(`发送账单通知: ${billNo} - ${amount}`);
   }
 
   /**
