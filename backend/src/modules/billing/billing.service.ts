@@ -2,28 +2,21 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaClient, BillStatus } from '@prisma/client';
 import { QueryBillDto } from './dto/query-bill.dto';
 import { CreateBillDto } from './dto/create-bill.dto';
+import { CodeGeneratorService } from '../../common/services/code-generator.service';
+import { PaginationUtil } from '../../common/utils/pagination.util';
 
 @Injectable()
 export class BillingService {
-  constructor(private readonly prisma: PrismaClient) {}
-
-  /**
-   * 生成账单号
-   */
-  private generateBillNo(): string {
-    const date = new Date();
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-    return `BILL${year}${month}${day}${random}`;
-  }
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly codeGenerator: CodeGeneratorService,
+  ) {}
 
   /**
    * 创建账单
    */
   async createBill(createBillDto: CreateBillDto) {
-    const billNo = this.generateBillNo();
+    const billNo = this.codeGenerator.generateBillNo();
 
     const bill = await this.prisma.bill.create({
       data: {
@@ -121,22 +114,14 @@ export class BillingService {
             },
           },
         },
-        skip: (page - 1) * pageSize,
+        skip: PaginationUtil.calculateSkip(page, pageSize),
         take: pageSize,
         orderBy: { createdAt: 'desc' },
       }),
       this.prisma.bill.count({ where }),
     ]);
 
-    return {
-      list,
-      pagination: {
-        page,
-        pageSize,
-        total,
-        totalPages: Math.ceil(total / pageSize),
-      },
-    };
+    return PaginationUtil.createResult(list, total, page, pageSize);
   }
 
   /**
@@ -293,21 +278,13 @@ export class BillingService {
             },
           },
         },
-        skip: (page - 1) * pageSize,
+        skip: PaginationUtil.calculateSkip(page, pageSize),
         take: pageSize,
         orderBy: { createdAt: 'desc' },
       }),
       this.prisma.bill.count({ where }),
     ]);
 
-    return {
-      list,
-      pagination: {
-        page,
-        pageSize,
-        total,
-        totalPages: Math.ceil(total / pageSize),
-      },
-    };
+    return PaginationUtil.createResult(list, total, page, pageSize);
   }
 }

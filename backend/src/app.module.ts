@@ -10,7 +10,10 @@ import { BillingModule } from './modules/billing/billing.module';
 import { SyncModule } from './modules/sync/sync.module';
 import { AiModule } from './modules/ai/ai.module';
 import { NotifyModule } from './modules/notify/notify.module';
+import { NotificationModule } from './modules/notification/notification.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { TrackingModule } from './modules/tracking/tracking.module';
+import { InternalModule } from './modules/internal/internal.module';
 import { CommonModule } from './common/common.module';
 import { PrismaModule } from './common/prisma/prisma.module';
 
@@ -44,7 +47,10 @@ import { PrismaModule } from './common/prisma/prisma.module';
     SyncModule,
     AiModule,
     NotifyModule,
+    NotificationModule,
     AdminModule,
+    TrackingModule,
+    InternalModule,
   ],
 })
 export class AppModule {}

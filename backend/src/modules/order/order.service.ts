@@ -3,28 +3,23 @@ import { PrismaClient, OrderStatus } from '@prisma/client';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { QueryOrderDto } from './dto/query-order.dto';
+import { CodeGeneratorService } from '../../common/utils/code-generator.service';
+import { DateUtilService } from '../../common/utils/date-util.service';
+import { PaginationUtil } from '../../common/utils/pagination.util';
 
 @Injectable()
 export class OrderService {
-  constructor(private readonly prisma: PrismaClient) {}
-
-  /**
-   * 生成订单号
-   */
-  private generateOrderNo(): string {
-    const date = new Date();
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-    return `ORD${year}${month}${day}${random}`;
-  }
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly codeGenerator: CodeGeneratorService,
+    private readonly dateUtil: DateUtilService,
+  ) {}
 
   /**
    * 创建订单
    */
   async create(userId: string, companyId: string, createOrderDto: CreateOrderDto) {
-    const orderNo = this.generateOrderNo();
+    const orderNo = this.codeGenerator.generateOrderNo();
 
     const order = await this.prisma.order.create({
       data: {
@@ -44,8 +39,8 @@ export class OrderService {
         cargoPackageCount: createOrderDto.cargoPackageCount,
         containerType: createOrderDto.containerType,
         containerCount: createOrderDto.containerCount,
-        etd: createOrderDto.etd ? new Date(createOrderDto.etd) : null,
-        eta: createOrderDto.eta ? new Date(createOrderDto.eta) : null,
+        etd: this.dateUtil.parseDate(createOrderDto.etd),
+        eta: this.dateUtil.parseDate(createOrderDto.eta),
         shipperName: createOrderDto.shipperName,
         shipperAddress: createOrderDto.shipperAddress,
         shipperContact: createOrderDto.shipperContact,
@@ -130,22 +125,14 @@ export class OrderService {
             },
           },
         },
-        skip: (page - 1) * pageSize,
+        skip: PaginationUtil.calculateSkip(page, pageSize),
         take: pageSize,
         orderBy: { createdAt: 'desc' },
       }),
       this.prisma.order.count({ where }),
     ]);
 
-    return {
-      list,
-      pagination: {
-        page,
-        pageSize,
-        total,
-        totalPages: Math.ceil(total / pageSize),
-      },
-    };
+    return PaginationUtil.createResult(list, total, page, pageSize);
   }
 
   /**
@@ -272,6 +259,88 @@ export class OrderService {
   }
 
   /**
+   * 导出订单为CSV
+   */
+  async exportOrders(companyId: string, query: QueryOrderDto) {
+    const { status, type, keyword } = query;
+
+    const where: any = { companyId };
+
+    if (status) {
+      where.status = status;
+    }
+
+    if (type) {
+      where.type = type;
+    }
+
+    if (keyword) {
+      where.OR = [
+        { orderNo: { contains: keyword } },
+        { originPort: { contains: keyword } },
+        { destinationPort: { contains: keyword } },
+        { cargoDesc: { contains: keyword } },
+      ];
+    }
+
+    const orders = await this.prisma.order.findMany({
+      where,
+      include: {
+        company: {
+          select: {
+            companyName: true,
+          },
+        },
+        creator: {
+          select: {
+            username: true,
+            realName: true,
+          },
+        },
+        shipments: {
+          select: {
+            containerNo: true,
+            status: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // 生成CSV
+    const headers = ['订单号', '类型', '状态', '起始港', '目的港', '货物描述', '货重(KG)', '货量(CBM)', '箱型', '箱量', 'ETD', 'ETA', '发货人', '收货人', '通知人', '创建人', '创建时间'];
+    
+    const rows = orders.map(order => [
+      order.orderNo,
+      order.type,
+      order.status,
+      order.originPortName,
+      order.destinationPortName,
+      order.cargoDesc || '',
+      order.cargoWeight || '',
+      order.cargoVolume || '',
+      order.containerType || '',
+      order.containerCount || '',
+      order.etd ? new Date(order.etd).toISOString().split('T')[0] : '',
+      order.eta ? new Date(order.eta).toISOString().split('T')[0] : '',
+      order.shipperName || '',
+      order.consigneeName || '',
+      order.notifyName || '',
+      order.creator?.realName || order.creator?.username || '',
+      new Date(order.createdAt).toISOString().split('T')[0],
+    ]);
+
+    // 添加BOM以支持中文
+    const bom = '\uFEFF';
+    const csv = bom + [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
+    ].join('\n');
+
+    return csv;
+  }
+
+  /**
    * 获取所有订单（管理后台用）
    */
   async findAllAdmin(query: QueryOrderDto) {
@@ -314,22 +383,14 @@ export class OrderService {
             },
           },
         },
-        skip: (page - 1) * pageSize,
+        skip: PaginationUtil.calculateSkip(page, pageSize),
         take: pageSize,
         orderBy: { createdAt: 'desc' },
       }),
       this.prisma.order.count({ where }),
     ]);
 
-    return {
-      list,
-      pagination: {
-        page,
-        pageSize,
-        total,
-        totalPages: Math.ceil(total / pageSize),
-      },
-    };
+    return PaginationUtil.createResult(list, total, page, pageSize);
   }
 
   /**

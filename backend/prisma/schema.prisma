@@ -193,6 +193,8 @@ model Shipment {
   company         Company         @relation(fields: [companyId], references: [id])
   order           Order?          @relation(fields: [orderId], references: [id])
   nodes           ShipmentNode[]
+  pushRecords     InternalPushRecord[]
+  subscription    ContainerSubscription?
   
   @@index([containerNo])
   @@index([companyId])
@@ -338,7 +340,57 @@ model OperationLog {
   @@map("operation_logs")
 }
 
-// 枚举定义
+// 订单状态变更历史表
+model OrderStatusHistory {
+  id          String       @id @default(uuid())
+  orderId     String       @map("order_id")
+  fromStatus  OrderStatus? @map("from_status")
+  toStatus    OrderStatus  @map("to_status")
+  reason      String?      @db.Text
+  remark      String?      @db.Text
+  operatorId  String?      @map("operator_id")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  
+  @@index([orderId])
+  @@index([createdAt])
+  @@map("order_status_history")
+}
+
+// 账单状态变更历史表
+model BillStatusHistory {
+  id          String       @id @default(uuid())
+  billId      String       @map("bill_id")
+  fromStatus  BillStatus?  @map("from_status")
+  toStatus    BillStatus   @map("to_status")
+  reason      String?      @db.Text
+  operatorId  String?      @map("operator_id")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  
+  @@index([billId])
+  @@index([createdAt])
+  @@map("bill_status_history")
+}
+
+// 企业认证信息表
+model CompanyVerification {
+  id                  String   @id @default(uuid())
+  companyId           String   @unique @map("company_id")
+  businessLicenseUrl  String?  @map("business_license_url") @db.VarChar(500)
+  legalPersonName     String?  @map("legal_person_name") @db.VarChar(100)
+  legalPersonIdCard   String?  @map("legal_person_id_card") @db.VarChar(50)
+  verificationStatus  String   @default("PENDING") @map("verification_status") @db.VarChar(50)
+  submittedAt         DateTime @default(now()) @map("submitted_at")
+  reviewedAt          DateTime? @map("reviewed_at")
+  reviewerId          String?  @map("reviewer_id")
+  reviewRemark        String?  @map("review_remark") @db.Text
+  remark              String?  @db.Text
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+  
+  @@index([verificationStatus])
+  @@index([submittedAt])
+  @@map("company_verifications")
+}
 enum UserStatus {
   ACTIVE
   INACTIVE
@@ -420,4 +472,140 @@ enum InvoiceStatus {
   SENT        // 已发送
   RECEIVED    // 已接收
   CANCELLED   // 已作废
+}
+
+// 通知表
+model Notification {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  type        String    @db.VarChar(50)
+  title       String    @db.VarChar(200)
+  content     String    @db.Text
+  link        String?   @db.VarChar(500)
+  metadata    Json?
+  isRead      Boolean   @default(false) @map("is_read")
+  readAt      DateTime? @map("read_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+// 订阅表
+model ShipmentSubscription {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  containerNo   String    @map("container_no") @db.VarChar(50)
+  email         String?   @db.VarChar(100)
+  phone         String?   @db.VarChar(20)
+  notifyOnUpdate Boolean @default(true) @map("notify_on_update")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  
+  @@unique([userId, containerNo])
+  @@index([containerNo])
+  @@map("shipment_subscriptions")
+}
+
+// 同步日志表
+model SyncLog {
+  id          String       @id @default(uuid())
+  shipmentId  String       @map("shipment_id") @db.VarChar(100)
+  syncType    String       @map("sync_type") @db.VarChar(50)
+  status      SyncLogStatus @default(PENDING)
+  message     String?      @db.Text
+  syncedAt    DateTime     @default(now()) @map("synced_at")
+
+  @@index([shipmentId])
+  @@index([syncType])
+  @@index([status])
+  @@index([syncedAt])
+  @@map("sync_logs")
+}
+
+// 内部推送记录表
+model InternalPushRecord {
+  id              String    @id @default(uuid())
+  containerNo     String    @map("container_no") @db.VarChar(50)
+  shipmentId      String?   @map("shipment_id") @db.VarChar(100)
+  source          String    @db.VarChar(50) // 数据来源: 4portun, manual
+  pushType        String    @map("push_type") @db.VarChar(50) // 推送类型: webhook, api, batch
+  status          PushStatus @default(PENDING)
+  payload         Json?     // 推送的数据内容
+  response        Json?     // 内部系统响应
+  errorMsg        String?   @map("error_msg") @db.Text
+  retryCount      Int       @default(0) @map("retry_count")
+  pushedAt        DateTime? @map("pushed_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // 关联
+  shipment        Shipment? @relation(fields: [shipmentId], references: [id])
+
+  @@index([containerNo])
+  @@index([shipmentId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("internal_push_records")
+}
+
+// 集装箱订阅管理表
+model ContainerSubscription {
+  id                String    @id @default(uuid())
+  containerNo       String    @unique @map("container_no") @db.VarChar(50)
+  shipmentId        String?   @unique @map("shipment_id") @db.VarChar(100)
+  companyId         String?   @map("company_id") @db.VarChar(100)
+  
+  // 订阅状态
+  isSubscribed      Boolean   @default(true) @map("is_subscribed")
+  subscribedAt      DateTime? @map("subscribed_at")
+  unsubscribedAt    DateTime? @map("unsubscribed_at")
+  
+  // 4portun 订阅状态
+  externalSubscribed Boolean  @default(false) @map("external_subscribed")
+  externalSubId     String?   @map("external_sub_id") @db.VarChar(100)
+  
+  // 同步配置
+  autoSync          Boolean   @default(true) @map("auto_sync")
+  syncInterval      Int       @default(300) @map("sync_interval") // 同步间隔(秒)
+  lastSyncAt        DateTime? @map("last_sync_at")
+  nextSyncAt        DateTime? @map("next_sync_at")
+  
+  // 统计信息
+  totalPushes       Int       @default(0) @map("total_pushes")
+  lastPushAt        DateTime? @map("last_push_at")
+  
+  // 元数据
+  metadata          Json?
+  remark            String?   @db.Text
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  // 关联
+  shipment          Shipment? @relation(fields: [shipmentId], references: [id])
+
+  @@index([containerNo])
+  @@index([shipmentId])
+  @@index([companyId])
+  @@index([isSubscribed])
+  @@index([externalSubscribed])
+  @@index([lastSyncAt])
+  @@map("container_subscriptions")
+}
+
+enum SyncLogStatus {
+  PENDING   // 待同步
+  SUCCESS   // 同步成功
+  FAILED    // 同步失败
+  RETRYING  // 重试中
+}
+
+enum PushStatus {
+  PENDING    // 待推送
+  PUSHING    // 推送中
+  SUCCESS    // 推送成功
+  FAILED     // 推送失败
+  RETRYING   // 重试中
 }

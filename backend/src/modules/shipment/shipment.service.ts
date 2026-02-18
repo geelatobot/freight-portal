@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
-import { SyncService } from '../sync/sync.service';
+import { SyncService } from '../sync/services/sync.service';
+import { QueryShipmentDto } from './dto/query-shipment.dto';
 
 @Injectable()
 export class ShipmentService {
@@ -34,7 +35,11 @@ export class ShipmentService {
     
     if (needSync) {
       try {
-        await this.syncService.syncContainer(containerNo, companyId);
+        const syncResult = await this.syncService.syncContainer(containerNo, companyId);
+        // 如果同步返回 null 且本地没有数据，抛出异常
+        if (!syncResult && !shipment) {
+          throw new NotFoundException('未找到该集装箱的跟踪信息');
+        }
         // 重新查询以获取完整数据
         shipment = await this.prisma.shipment.findUnique({
           where: { containerNo },
@@ -56,6 +61,10 @@ export class ShipmentService {
           throw new NotFoundException('未找到该集装箱的跟踪信息');
         }
       }
+    }
+
+    if (!shipment) {
+      throw new NotFoundException('未找到该集装箱的跟踪信息');
     }
 
     return shipment;
@@ -86,8 +95,8 @@ export class ShipmentService {
   /**
    * 获取企业货物列表
    */
-  async getCompanyShipments(companyId: string, query: any) {
-    const { page = 1, pageSize = 20, status, keyword } = query;
+  async getCompanyShipments(companyId: string, query: QueryShipmentDto) {
+    const { page = 1, pageSize = 20, status, keyword, sortBy, sortOrder } = query;
     
     const where: any = { companyId };
     
@@ -102,6 +111,9 @@ export class ShipmentService {
         { shipName: { contains: keyword } },
       ];
     }
+
+    // 构建排序条件
+    const orderBy: any = sortBy ? { [sortBy]: sortOrder || 'desc' } : { updatedAt: 'desc' };
 
     const [list, total] = await Promise.all([
       this.prisma.shipment.findMany({
@@ -120,7 +132,7 @@ export class ShipmentService {
         },
         skip: (page - 1) * pageSize,
         take: pageSize,
-        orderBy: { updatedAt: 'desc' },
+        orderBy,
       }),
       this.prisma.shipment.count({ where }),
     ]);
@@ -168,6 +180,55 @@ export class ShipmentService {
     }
 
     return shipment;
+  }
+
+  /**
+   * 同步货物数据
+   */
+  async syncShipment(id: string, companyId?: string) {
+    const shipment = await this.prisma.shipment.findFirst({
+      where: { id, companyId },
+    });
+
+    if (!shipment) {
+      throw new NotFoundException('货物不存在');
+    }
+
+    const result = await this.syncService.syncContainer(shipment.containerNo, companyId);
+
+    return {
+      message: result.success ? '同步成功' : '同步失败',
+      success: result.success,
+      containerNo: result.containerNo,
+      eventCount: result.eventCount,
+      updatedAt: result.updatedAt,
+    };
+  }
+
+  /**
+   * 获取货物节点历史
+   */
+  async getShipmentNodes(id: string) {
+    const shipment = await this.prisma.shipment.findUnique({
+      where: { id },
+      include: {
+        nodes: {
+          orderBy: { eventTime: 'desc' },
+        },
+      },
+    });
+
+    if (!shipment) {
+      throw new NotFoundException('货物不存在');
+    }
+
+    return {
+      shipmentId: shipment.id,
+      containerNo: shipment.containerNo,
+      status: shipment.status,
+      currentNode: shipment.currentNode,
+      nodes: shipment.nodes,
+    };
   }
 
   /**

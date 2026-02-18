@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Body, Query, UseGuards, Request, Param } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, UseGuards, Request, Param, HttpCode, HttpStatus } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ShipmentService } from './shipment.service';
 import { TrackContainerDto } from './dto/track-container.dto';
+import { QueryShipmentDto } from './dto/query-shipment.dto';
 
 @Controller('shipments')
 export class ShipmentController {
@@ -28,7 +29,7 @@ export class ShipmentController {
    */
   @Get()
   @UseGuards(JwtAuthGuard)
-  async getShipments(@Request() req, @Query() query) {
+  async getShipments(@Request() req, @Query() query: QueryShipmentDto) {
     // 从用户的企业列表中获取默认企业
     const companyId = query.companyId || req.user.defaultCompanyId;
     return this.shipmentService.getCompanyShipments(companyId, query);
@@ -41,5 +42,32 @@ export class ShipmentController {
   @UseGuards(JwtAuthGuard)
   async getShipmentDetail(@Param('id') id: string) {
     return this.shipmentService.getShipmentDetail(id);
+  }
+
+  /**
+   * 同步货物数据（需登录）
+   */
+  @Post(':id/sync')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async syncShipment(@Param('id') id: string, @Request() req) {
+    return this.shipmentService.syncShipment(id, req.user.defaultCompanyId);
+  }
+
+  /**
+   * 获取货物节点历史（需登录）
+   */
+  @Get(':id/nodes')
+  @UseGuards(JwtAuthGuard)
+  async getShipmentNodes(@Param('id') id: string) {
+    return this.shipmentService.getShipmentNodes(id);
+  }
+
+  /**
+   * 根据集装箱号查询跟踪信息（公开接口，无需登录）
+   */
+  @Get('tracking/:containerNo')
+  async trackByContainerNo(@Param('containerNo') containerNo: string) {
+    return this.shipmentService.trackContainer(containerNo);
   }
 }

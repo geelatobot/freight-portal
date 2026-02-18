@@ -6,6 +6,7 @@ import * as jwt from 'jsonwebtoken';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { DataSanitizerService } from '../../common/utils/data-sanitizer.service';
 
 @Injectable()
 export class AuthService {
@@ -16,6 +17,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly configService: ConfigService,
+    private readonly dataSanitizer: DataSanitizerService,
   ) {
     this.jwtSecret = this.configService.get('JWT_SECRET') || 'default-secret';
     this.jwtExpiresIn = this.configService.get('JWT_EXPIRES_IN') || '15m';
@@ -70,7 +72,7 @@ export class AuthService {
     const tokens = await this.generateTokens(user);
 
     return {
-      user: this.sanitizeUser(user),
+      user: this.dataSanitizer.sanitizeUser(user),
       companies: user.companyUsers.map(cu => ({
         id: cu.company.id,
         name: cu.company.companyName,
@@ -143,7 +145,7 @@ export class AuthService {
     const tokens = await this.generateTokens(result.user);
 
     return {
-      user: this.sanitizeUser(result.user),
+      user: this.dataSanitizer.sanitizeUser(result.user),
       company: {
         id: result.company.id,
         name: result.company.companyName,
@@ -223,14 +225,6 @@ export class AuthService {
   }
 
   /**
-   * 清理用户敏感信息
-   */
-  private sanitizeUser(user: any) {
-    const { passwordHash, ...sanitized } = user;
-    return sanitized;
-  }
-
-  /**
    * 验证Token
    */
   async validateToken(token: string) {
@@ -244,9 +238,27 @@ export class AuthService {
         return null;
       }
 
-      return this.sanitizeUser(user);
+      return this.dataSanitizer.sanitizeUser(user);
     } catch (error) {
       return null;
     }
+  }
+
+  /**
+   * 获取用户资料
+   */
+  async getProfile(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { companyUsers: { include: { company: true } } },
+    });
+    return this.dataSanitizer.sanitizeUser(user);
+  }
+
+  /**
+   * 清理用户敏感信息
+   */
+  private sanitizeUser(user: any) {
+    return this.dataSanitizer.sanitizeUser(user);
   }
 }

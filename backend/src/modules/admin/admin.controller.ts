@@ -1,8 +1,10 @@
-import { Controller, Get, Post, Put, Body, Query, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Query, Param, UseGuards, Request } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OrderService } from '../order/order.service';
 import { BillingService } from '../billing/billing.service';
 import { CustomerService } from '../customer/customer.service';
+import { AdminService } from './admin.service';
+import { UpdateCreditDto } from './dto/admin.dto';
 import { PrismaClient, OrderStatus, CompanyStatus } from '@prisma/client';
 
 @Controller('admin')
@@ -12,6 +14,7 @@ export class AdminController {
     private readonly orderService: OrderService,
     private readonly billingService: BillingService,
     private readonly customerService: CustomerService,
+    private readonly adminService: AdminService,
     private readonly prisma: PrismaClient,
   ) {}
 
@@ -116,6 +119,25 @@ export class AdminController {
     });
   }
 
+  /**
+   * 获取企业详情
+   */
+  @Get('companies/:id')
+  async getCompanyDetail(@Param('id') id: string) {
+    return this.adminService.getCompanyDetail(id);
+  }
+
+  /**
+   * 更新企业信用额度
+   */
+  @Put('companies/:id/credit')
+  async updateCompanyCredit(
+    @Param('id') id: string,
+    @Body() dto: UpdateCreditDto,
+  ) {
+    return this.adminService.updateCredit(id, dto);
+  }
+
   // ========== 订单管理 ==========
   @Get('orders')
   async getAllOrders(@Query() query: any) {
@@ -144,5 +166,11 @@ export class AdminController {
     @Body('remark') remark?: string,
   ) {
     return this.billingService.confirmPayment(id, paidAmount, remark);
+  }
+
+  @Get('auth/me')
+  @UseGuards(JwtAuthGuard)
+  async getCurrentUser(@Request() req) {
+    return req.user;
   }
 }
