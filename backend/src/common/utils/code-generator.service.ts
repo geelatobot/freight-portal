@@ -76,16 +76,16 @@ export class CodeGeneratorService {
     
     let dateStr: string;
     switch (dateFormat) {
-      case 'YYYYMM':
-        dateStr = `${year}${month}`;
-        break;
-      case 'YYYY':
-        dateStr = `${year}`;
-        break;
-      case 'YYYYMMDD':
-      default:
-        dateStr = `${year}${month}${day}`;
-        break;
+    case 'YYYYMM':
+      dateStr = `${year}${month}`;
+      break;
+    case 'YYYY':
+      dateStr = `${year}`;
+      break;
+    case 'YYYYMMDD':
+    default:
+      dateStr = `${year}${month}${day}`;
+      break;
     }
     
     const maxRandom = Math.pow(10, randomLength);

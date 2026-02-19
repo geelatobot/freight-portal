@@ -10,25 +10,25 @@ export class BaseQueryDto {
   @Type(() => Number)
   @IsNumber({}, { message: '页码必须是数字' })
   @Min(1, { message: '页码必须大于等于1' })
-  page?: number = 1;
+    page?: number = 1;
 
   @IsOptional()
   @Type(() => Number)
   @IsNumber({}, { message: '每页数量必须是数字' })
   @Min(1, { message: '每页数量必须大于等于1' })
   @Max(100, { message: '每页数量不能超过100' })
-  pageSize?: number = 20;
+    pageSize?: number = 20;
 
   @IsOptional()
   @Type(() => Number)
   @Min(0, { message: '跳过记录数不能为负数' })
-  skip?: number;
+    skip?: number;
 
   @IsOptional()
   @Type(() => Number)
   @Min(1, { message: '限制记录数必须大于等于1' })
   @Max(100, { message: '限制记录数不能超过100' })
-  take?: number;
+    take?: number;
 }
 
 /**
@@ -36,10 +36,10 @@ export class BaseQueryDto {
  */
 export class DateRangeQueryDto extends BaseQueryDto {
   @IsOptional()
-  startDate?: string;
+    startDate?: string;
 
   @IsOptional()
-  endDate?: string;
+    endDate?: string;
 }
 
 /**
@@ -47,5 +47,5 @@ export class DateRangeQueryDto extends BaseQueryDto {
  */
 export class KeywordQueryDto extends BaseQueryDto {
   @IsOptional()
-  keyword?: string;
+    keyword?: string;
 }

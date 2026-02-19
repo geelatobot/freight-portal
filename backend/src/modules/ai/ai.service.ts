@@ -142,7 +142,7 @@ export class AiService {
     }
 
     if (nodes.length > 1) {
-      description += `\n📋 **最近节点**：\n`;
+      description += '\n📋 **最近节点**：\n';
       nodes.slice(1, 4).forEach((node: any, index: number) => {
         description += `${index + 1}. ${node.nodeName} - ${new Date(node.eventTime).toLocaleDateString('zh-CN')}\n`;
       });

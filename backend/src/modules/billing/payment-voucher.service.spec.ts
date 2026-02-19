@@ -215,7 +215,7 @@ describe('PaymentVoucherService', () => {
       const result = await service.findVouchers('company-1', { page: 1, pageSize: 20 });
 
       expect(result.list).toHaveLength(2);
-      expect(result.total).toBe(2);
+      expect(result.pagination.total).toBe(2);
     });
   });
 });

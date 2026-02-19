@@ -25,6 +25,7 @@ model User {
   // 关联
   companyUsers  CompanyUser[]
   orders        Order[]
+  paymentVouchers PaymentVoucher[]
   
   @@map("users")
 }
@@ -50,6 +51,7 @@ model Company {
   orders          Order[]
   shipments       Shipment[]
   bills           Bill[]
+  paymentVouchers PaymentVoucher[]
   
   @@map("companies")
 }
@@ -254,6 +256,8 @@ model Bill {
   order         Order?      @relation(fields: [orderId], references: [id])
   items         BillItem[]
   invoice       Invoice?
+  invoiceApplications InvoiceApplication[]
+  paymentVouchers PaymentVoucher[]
   
   @@index([billNo])
   @@index([companyId])
@@ -392,6 +396,9 @@ model InvoiceApplication {
   createdAt         DateTime                   @default(now()) @map("created_at")
   updatedAt         DateTime                   @updatedAt @map("updated_at")
   
+  // 关联
+  bill              Bill                       @relation(fields: [billId], references: [id])
+  
   @@index([companyId])
   @@index([billId])
   @@index([status])
@@ -427,6 +434,11 @@ model PaymentVoucher {
   
   createdAt         DateTime              @default(now()) @map("created_at")
   updatedAt         DateTime              @updatedAt @map("updated_at")
+  
+  // 关联
+  bill              Bill                  @relation(fields: [billId], references: [id])
+  company           Company               @relation(fields: [companyId], references: [id])
+  uploader          User                  @relation(fields: [uploaderId], references: [id])
   
   @@index([billId])
   @@index([companyId])

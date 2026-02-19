@@ -60,18 +60,18 @@ export class DateUtilService {
     const seconds = String(d.getSeconds()).padStart(2, '0');
 
     switch (format) {
-      case 'YYYY-MM-DD':
-        return `${year}-${month}-${day}`;
-      case 'YYYY-MM-DD HH:mm:ss':
-        return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-      case 'YYYY/MM/DD':
-        return `${year}/${month}/${day}`;
-      case 'DD/MM/YYYY':
-        return `${day}/${month}/${year}`;
-      case 'MM-DD-YYYY':
-        return `${month}-${day}-${year}`;
-      default:
-        return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    case 'YYYY-MM-DD':
+      return `${year}-${month}-${day}`;
+    case 'YYYY-MM-DD HH:mm:ss':
+      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    case 'YYYY/MM/DD':
+      return `${year}/${month}/${day}`;
+    case 'DD/MM/YYYY':
+      return `${day}/${month}/${year}`;
+    case 'MM-DD-YYYY':
+      return `${month}-${day}-${year}`;
+    default:
+      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
     }
   }
 

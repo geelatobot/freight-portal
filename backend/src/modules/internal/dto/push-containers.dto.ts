@@ -13,112 +13,112 @@ export enum PushSource {
 
 export class ContainerNodeDto {
   @IsString()
-  nodeCode: string;
+    nodeCode: string;
 
   @IsString()
-  nodeName: string;
-
-  @IsString()
-  @IsOptional()
-  location?: string;
+    nodeName: string;
 
   @IsString()
   @IsOptional()
-  locationCode?: string;
-
-  @IsString()
-  eventTime: string;
+    location?: string;
 
   @IsString()
   @IsOptional()
-  description?: string;
+    locationCode?: string;
+
+  @IsString()
+    eventTime: string;
 
   @IsString()
   @IsOptional()
-  operator?: string;
+    description?: string;
 
   @IsString()
   @IsOptional()
-  vesselName?: string;
+    operator?: string;
 
   @IsString()
   @IsOptional()
-  voyageNo?: string;
+    vesselName?: string;
+
+  @IsString()
+  @IsOptional()
+    voyageNo?: string;
 }
 
 export class ContainerDataDto {
   @IsString()
-  containerNo: string;
+    containerNo: string;
 
   @IsString()
   @IsOptional()
-  containerType?: string;
+    containerType?: string;
 
   @IsString()
   @IsOptional()
-  blNo?: string;
+    blNo?: string;
 
   @IsString()
   @IsOptional()
-  bookingNo?: string;
+    bookingNo?: string;
 
   @IsString()
   @IsOptional()
-  carrierCode?: string;
+    carrierCode?: string;
 
   @IsString()
   @IsOptional()
-  carrierName?: string;
+    carrierName?: string;
 
   @IsString()
   @IsOptional()
-  originPort?: string;
+    originPort?: string;
 
   @IsString()
   @IsOptional()
-  destinationPort?: string;
+    destinationPort?: string;
 
   @IsString()
   @IsOptional()
-  etd?: string;
+    etd?: string;
 
   @IsString()
   @IsOptional()
-  eta?: string;
+    eta?: string;
 
   @IsString()
   @IsOptional()
-  atd?: string;
+    atd?: string;
 
   @IsString()
   @IsOptional()
-  ata?: string;
+    ata?: string;
 
   @IsString()
   @IsOptional()
-  status?: string;
+    status?: string;
 
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ContainerNodeDto)
   @IsOptional()
-  nodes?: ContainerNodeDto[];
+    nodes?: ContainerNodeDto[];
 }
 
 export class PushContainersDto {
   @IsEnum(PushSource)
-  source: PushSource;
+    source: PushSource;
 
   @IsString()
   @IsOptional()
-  pushType?: string;
+    pushType?: string;
 
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ContainerDataDto)
-  containers: ContainerDataDto[];
+    containers: ContainerDataDto[];
 
   @IsObject()
   @IsOptional()
-  metadata?: Record<string, any>;
+    metadata?: Record<string, any>;
 }

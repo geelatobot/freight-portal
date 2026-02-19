@@ -29,13 +29,13 @@ describe('Security Tests', () => {
   describe('SQL Injection Tests', () => {
     it('should prevent SQL injection in login username', async () => {
       const maliciousPayloads = [
-        { username: "admin' OR '1'='1", password: 'password' },
-        { username: "admin' OR 1=1 --", password: 'password' },
-        { username: "admin'; DROP TABLE users; --", password: 'password' },
-        { username: "admin' UNION SELECT * FROM users --", password: 'password' },
-        { username: "admin' AND 1=1 --", password: 'password' },
-        { username: "admin'/**/OR/**/'1'='1", password: 'password' },
-        { username: "admin' OR '1'='1' /*", password: 'password' },
+        { username: 'admin\' OR \'1\'=\'1', password: 'password' },
+        { username: 'admin\' OR 1=1 --', password: 'password' },
+        { username: 'admin\'; DROP TABLE users; --', password: 'password' },
+        { username: 'admin\' UNION SELECT * FROM users --', password: 'password' },
+        { username: 'admin\' AND 1=1 --', password: 'password' },
+        { username: 'admin\'/**/OR/**/\'1\'=\'1', password: 'password' },
+        { username: 'admin\' OR \'1\'=\'1\' /*', password: 'password' },
       ];
 
       for (const payload of maliciousPayloads) {
@@ -59,12 +59,12 @@ describe('Security Tests', () => {
         authToken = loginResponse.body.accessToken;
 
         const maliciousKeywords = [
-          "'; DROP TABLE orders; --",
-          "' OR '1'='1",
-          "1' UNION SELECT * FROM users --",
-          "'; DELETE FROM orders WHERE '1'='1",
-          "test' AND 1=1 --",
-          "test'/**/OR/**/'1'='1",
+          '\'; DROP TABLE orders; --',
+          '\' OR \'1\'=\'1',
+          '1\' UNION SELECT * FROM users --',
+          '\'; DELETE FROM orders WHERE \'1\'=\'1',
+          'test\' AND 1=1 --',
+          'test\'/**/OR/**/\'1\'=\'1',
         ];
 
         for (const keyword of maliciousKeywords) {
@@ -81,10 +81,10 @@ describe('Security Tests', () => {
 
     it('should prevent SQL injection in order ID parameter', async () => {
       const maliciousIds = [
-        "1' OR '1'='1",
-        "1; DROP TABLE orders; --",
-        "1' UNION SELECT * FROM users --",
-        "1' AND 1=1 --",
+        '1\' OR \'1\'=\'1',
+        '1; DROP TABLE orders; --',
+        '1\' UNION SELECT * FROM users --',
+        '1\' AND 1=1 --',
       ];
 
       for (const id of maliciousIds) {
@@ -99,9 +99,9 @@ describe('Security Tests', () => {
 
     it('should prevent SQL injection in container number', async () => {
       const maliciousContainerNos = [
-        "MSCU1234567' OR '1'='1",
-        "MSCU1234567'; DROP TABLE shipments; --",
-        "MSCU1234567' UNION SELECT * FROM users --",
+        'MSCU1234567\' OR \'1\'=\'1',
+        'MSCU1234567\'; DROP TABLE shipments; --',
+        'MSCU1234567\' UNION SELECT * FROM users --',
       ];
 
       for (const containerNo of maliciousContainerNos) {
@@ -124,7 +124,7 @@ describe('Security Tests', () => {
         '<iframe src="javascript:alert(\'XSS\')">',
         '<input onfocus=alert("XSS") autofocus>',
         '<script>document.location="http://evil.com"\u003c/script>',
-        "'><script>alert('XSS')\u003c/script>",
+        '\'><script>alert(\'XSS\')\u003c/script>',
         '<ScRiPt>alert("XSS")\u003c/ScRiPt>',
         '<script src=http://evil.com/xss.js></script>',
         'javascript:alert("XSS")',
@@ -196,18 +196,18 @@ describe('Security Tests', () => {
         let requestBuilder: any;
         
         switch (endpoint.method) {
-          case 'GET':
-            requestBuilder = request(app.getHttpServer()).get(endpoint.url);
-            break;
-          case 'POST':
-            requestBuilder = request(app.getHttpServer()).post(endpoint.url).send(endpoint.body);
-            break;
-          case 'PUT':
-            requestBuilder = request(app.getHttpServer()).put(endpoint.url).send(endpoint.body);
-            break;
-          case 'DELETE':
-            requestBuilder = request(app.getHttpServer()).delete(endpoint.url);
-            break;
+        case 'GET':
+          requestBuilder = request(app.getHttpServer()).get(endpoint.url);
+          break;
+        case 'POST':
+          requestBuilder = request(app.getHttpServer()).post(endpoint.url).send(endpoint.body);
+          break;
+        case 'PUT':
+          requestBuilder = request(app.getHttpServer()).put(endpoint.url).send(endpoint.body);
+          break;
+        case 'DELETE':
+          requestBuilder = request(app.getHttpServer()).delete(endpoint.url);
+          break;
         }
 
         const response = await requestBuilder;

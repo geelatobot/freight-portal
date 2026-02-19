@@ -9,11 +9,11 @@ export enum ReviewStatus {
 export class ReviewInvoiceApplicationDto {
   @ApiProperty({ enum: ReviewStatus, description: '审核状态' })
   @IsEnum(ReviewStatus)
-  status: ReviewStatus;
+    status: ReviewStatus;
 
   @ApiPropertyOptional({ description: '审核备注' })
   @IsString()
   @IsOptional()
   @MaxLength(500)
-  remark?: string;
+    remark?: string;
 }

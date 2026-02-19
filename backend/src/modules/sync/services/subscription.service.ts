@@ -53,7 +53,7 @@ export class SubscriptionService implements OnModuleInit {
     }
 
     // 查找对应的货物
-    let shipment = shipmentId
+    const shipment = shipmentId
       ? await this.prisma.shipment.findUnique({ where: { id: shipmentId } })
       : await this.prisma.shipment.findUnique({ where: { containerNo } });
 

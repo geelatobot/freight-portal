@@ -14,7 +14,7 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { Roles, Role } from '../../common/decorators/roles.decorator';
 import { InvoiceService } from './invoice.service';
 import { CreateInvoiceApplicationDto } from './dto/create-invoice-application.dto';
 import { QueryInvoiceApplicationDto } from './dto/query-invoice-application.dto';
@@ -66,7 +66,7 @@ export class InvoiceController {
   // 管理端接口
   @Get('admin/applications')
   @UseGuards(RolesGuard)
-  @Roles('ADMIN')
+  @Roles(Role.ADMIN)
   @ApiOperation({ summary: '【管理端】获取所有发票申请' })
   async findAllApplications(@Query() query: QueryInvoiceApplicationDto) {
     return this.invoiceService.findAllApplications(query);
@@ -74,7 +74,7 @@ export class InvoiceController {
 
   @Put('admin/applications/:id/review')
   @UseGuards(RolesGuard)
-  @Roles('ADMIN')
+  @Roles(Role.ADMIN)
   @ApiOperation({ summary: '【管理端】审核发票申请' })
   async reviewApplication(
     @Param('id') id: string,
@@ -87,7 +87,7 @@ export class InvoiceController {
 
   @Post('admin/applications/:id/issue')
   @UseGuards(RolesGuard)
-  @Roles('ADMIN')
+  @Roles(Role.ADMIN)
   @ApiOperation({ summary: '【管理端】开具发票' })
   async issueInvoice(
     @Param('id') id: string,
@@ -99,7 +99,7 @@ export class InvoiceController {
 
   @Get('admin/stats')
   @UseGuards(RolesGuard)
-  @Roles('ADMIN')
+  @Roles(Role.ADMIN)
   @ApiOperation({ summary: '【管理端】获取发票统计' })
   async getStats(@Request() req) {
     const companyId = req.user.companyId;

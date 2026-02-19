@@ -4,9 +4,9 @@ export class BatchTrackDto {
   @IsArray()
   @IsString({ each: true })
   @IsNotEmpty({ each: true })
-  containerNos: string[];
+    containerNos: string[];
 
   @IsString()
   @IsOptional()
-  companyId?: string;
+    companyId?: string;
 }

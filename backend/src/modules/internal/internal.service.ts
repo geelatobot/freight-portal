@@ -332,72 +332,72 @@ export class InternalService implements OnModuleInit {
     });
 
     switch (action) {
-      case SubscriptionAction.SUBSCRIBE:
-        await this.prisma.containerSubscription.upsert({
-          where: { containerNo },
-          update: {
-            isSubscribed: true,
-            subscribedAt: new Date(),
-            unsubscribedAt: null,
-            companyId: companyId || shipment?.companyId,
-            shipmentId: shipment?.id,
-            autoSync: autoSync ?? true,
-            syncInterval: syncInterval ?? 300,
-            remark,
-          },
-          create: {
-            containerNo,
-            shipmentId: shipment?.id,
-            companyId: companyId || shipment?.companyId,
-            isSubscribed: true,
-            subscribedAt: new Date(),
-            autoSync: autoSync ?? true,
-            syncInterval: syncInterval ?? 300,
-            remark,
-          },
-        });
-        return {
+    case SubscriptionAction.SUBSCRIBE:
+      await this.prisma.containerSubscription.upsert({
+        where: { containerNo },
+        update: {
+          isSubscribed: true,
+          subscribedAt: new Date(),
+          unsubscribedAt: null,
+          companyId: companyId || shipment?.companyId,
+          shipmentId: shipment?.id,
+          autoSync: autoSync ?? true,
+          syncInterval: syncInterval ?? 300,
+          remark,
+        },
+        create: {
           containerNo,
-          action,
-          status: 'success',
-          message: 'Subscribed successfully',
-        };
+          shipmentId: shipment?.id,
+          companyId: companyId || shipment?.companyId,
+          isSubscribed: true,
+          subscribedAt: new Date(),
+          autoSync: autoSync ?? true,
+          syncInterval: syncInterval ?? 300,
+          remark,
+        },
+      });
+      return {
+        containerNo,
+        action,
+        status: 'success',
+        message: 'Subscribed successfully',
+      };
 
-      case SubscriptionAction.UNSUBSCRIBE:
-        await this.prisma.containerSubscription.updateMany({
-          where: { containerNo },
-          data: {
-            isSubscribed: false,
-            unsubscribedAt: new Date(),
-            externalSubscribed: false,
-          },
-        });
-        return {
-          containerNo,
-          action,
-          status: 'success',
-          message: 'Unsubscribed successfully',
-        };
+    case SubscriptionAction.UNSUBSCRIBE:
+      await this.prisma.containerSubscription.updateMany({
+        where: { containerNo },
+        data: {
+          isSubscribed: false,
+          unsubscribedAt: new Date(),
+          externalSubscribed: false,
+        },
+      });
+      return {
+        containerNo,
+        action,
+        status: 'success',
+        message: 'Unsubscribed successfully',
+      };
 
-      case SubscriptionAction.UPDATE:
-        await this.prisma.containerSubscription.updateMany({
-          where: { containerNo },
-          data: {
-            companyId: companyId || undefined,
-            autoSync: autoSync ?? undefined,
-            syncInterval: syncInterval ?? undefined,
-            remark: remark ?? undefined,
-          },
-        });
-        return {
-          containerNo,
-          action,
-          status: 'success',
-          message: 'Updated successfully',
-        };
+    case SubscriptionAction.UPDATE:
+      await this.prisma.containerSubscription.updateMany({
+        where: { containerNo },
+        data: {
+          companyId: companyId || undefined,
+          autoSync: autoSync ?? undefined,
+          syncInterval: syncInterval ?? undefined,
+          remark: remark ?? undefined,
+        },
+      });
+      return {
+        containerNo,
+        action,
+        status: 'success',
+        message: 'Updated successfully',
+      };
 
-      default:
-        throw new Error(`Unknown action: ${action}`);
+    default:
+      throw new Error(`Unknown action: ${action}`);
     }
   }
 

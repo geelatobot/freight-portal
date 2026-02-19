@@ -5,16 +5,16 @@ import { IsArray, IsObject, IsNumber } from 'class-validator';
  */
 export class PaginationMetaDto {
   @IsNumber()
-  page: number;
+    page: number;
 
   @IsNumber()
-  pageSize: number;
+    pageSize: number;
 
   @IsNumber()
-  total: number;
+    total: number;
 
   @IsNumber()
-  totalPages: number;
+    totalPages: number;
 
   constructor(page: number, pageSize: number, total: number) {
     this.page = page;
@@ -30,10 +30,10 @@ export class PaginationMetaDto {
  */
 export class PaginatedResponseDto<T> {
   @IsArray()
-  list: T[];
+    list: T[];
 
   @IsObject()
-  pagination: {
+    pagination: {
     page: number;
     pageSize: number;
     total: number;

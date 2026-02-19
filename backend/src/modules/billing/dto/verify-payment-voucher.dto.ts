@@ -9,11 +9,11 @@ export enum VerifyStatus {
 export class VerifyPaymentVoucherDto {
   @ApiProperty({ enum: VerifyStatus, description: '审核状态' })
   @IsEnum(VerifyStatus)
-  status: VerifyStatus;
+    status: VerifyStatus;
 
   @ApiPropertyOptional({ description: '审核备注' })
   @IsString()
   @IsOptional()
   @MaxLength(500)
-  remark?: string;
+    remark?: string;
 }

@@ -9,29 +9,29 @@ import { BaseQueryDto } from '../../../common/dto/base-query.dto';
 export class QueryShipmentDto extends BaseQueryDto {
   @IsOptional()
   @IsEnum(ShipmentStatus, { message: '运单状态不正确' })
-  status?: ShipmentStatus;
+    status?: ShipmentStatus;
 
   @IsOptional()
   @IsString({ message: '关键词必须是字符串' })
-  keyword?: string;
+    keyword?: string;
 
   @IsOptional()
   @IsString({ message: '集装箱号必须是字符串' })
-  containerNo?: string;
+    containerNo?: string;
 
   @IsOptional()
   @IsString({ message: '订单ID必须是字符串' })
-  orderId?: string;
+    orderId?: string;
 
   @IsOptional()
   @IsString({ message: '公司ID必须是字符串' })
-  companyId?: string;
+    companyId?: string;
 
   @IsOptional()
   @IsString({ message: '排序字段必须是字符串' })
-  sortBy?: string;
+    sortBy?: string;
 
   @IsOptional()
   @IsString({ message: '排序顺序必须是字符串' })
-  sortOrder?: 'asc' | 'desc';
+    sortOrder?: 'asc' | 'desc';
 }

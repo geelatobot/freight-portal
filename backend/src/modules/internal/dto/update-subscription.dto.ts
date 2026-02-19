@@ -13,59 +13,59 @@ export enum SubscriptionAction {
 
 export class SubscriptionItemDto {
   @IsString()
-  containerNo: string;
+    containerNo: string;
 
   @IsEnum(SubscriptionAction)
-  action: SubscriptionAction;
+    action: SubscriptionAction;
 
   @IsString()
   @IsOptional()
-  companyId?: string;
+    companyId?: string;
 
   @IsBoolean()
   @IsOptional()
-  autoSync?: boolean;
+    autoSync?: boolean;
 
   @IsInt()
   @IsOptional()
-  syncInterval?: number;
+    syncInterval?: number;
 
   @IsString()
   @IsOptional()
-  remark?: string;
+    remark?: string;
 }
 
 export class UpdateSubscriptionDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => SubscriptionItemDto)
-  items: SubscriptionItemDto[];
+    items: SubscriptionItemDto[];
 }
 
 export class SubscriptionQueryDto {
   @IsString()
   @IsOptional()
-  containerNo?: string;
+    containerNo?: string;
 
   @IsString()
   @IsOptional()
-  companyId?: string;
+    companyId?: string;
 
   @IsBoolean()
   @IsOptional()
-  isSubscribed?: boolean;
+    isSubscribed?: boolean;
 
   @IsBoolean()
   @IsOptional()
-  externalSubscribed?: boolean;
+    externalSubscribed?: boolean;
 
   @IsInt()
   @IsOptional()
   @Type(() => Number)
-  page?: number;
+    page?: number;
 
   @IsInt()
   @IsOptional()
   @Type(() => Number)
-  pageSize?: number;
+    pageSize?: number;
 }

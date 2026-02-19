@@ -18,7 +18,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { Roles, Role } from '../../common/decorators/roles.decorator';
 import { PaymentVoucherService } from './payment-voucher.service';
 import { CreatePaymentVoucherDto } from './dto/create-payment-voucher.dto';
 import { QueryPaymentVoucherDto } from './dto/query-payment-voucher.dto';
@@ -37,7 +37,7 @@ export class PaymentVoucherController {
   @ApiOperation({ summary: '上传支付凭证' })
   async createVoucher(
     @Body() dto: CreatePaymentVoucherDto,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: any,
     @Request() req,
   ) {
     const companyId = req.user.companyId;
@@ -82,7 +82,7 @@ export class PaymentVoucherController {
   // 管理端接口
   @Get('admin/vouchers')
   @UseGuards(RolesGuard)
-  @Roles('ADMIN')
+  @Roles(Role.ADMIN)
   @ApiOperation({ summary: '【管理端】获取所有支付凭证' })
   async findAllVouchers(@Query() query: QueryPaymentVoucherDto) {
     return this.voucherService.findAllVouchers(query);
@@ -90,7 +90,7 @@ export class PaymentVoucherController {
 
   @Put('admin/vouchers/:id/verify')
   @UseGuards(RolesGuard)
-  @Roles('ADMIN')
+  @Roles(Role.ADMIN)
   @ApiOperation({ summary: '【管理端】审核支付凭证' })
   async verifyVoucher(
     @Param('id') id: string,
